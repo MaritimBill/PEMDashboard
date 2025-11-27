@@ -1,312 +1,292 @@
-const tf = require('@tensorflow/tfjs-node');
-const axios = require('axios');
-const moment = require('moment');
+const tf = require('@tensorflow/tfjs');
+const fs = require('fs');
+const path = require('path');
 
 class NeuralMPC {
-  constructor() {
-    this.model = null;
-    this.isTrained = false;
-    this.trainingHistory = [];
-    
-    // Data buffers for training
-    this.sensorDataBuffer = [];
-    this.weatherDataBuffer = [];
-    this.tariffDataBuffer = [];
-    this.demandDataBuffer = [];
-    
-    // MPC parameters
-    this.mpcConfig = {
-      predictionHorizon: 10,
-      controlHorizon: 5,
-      sampleTime: 1,
-      maxIterations: 100,
-      tolerance: 1e-4
-    };
-  }
-
-  async initialize() {
-    console.log('🧠 Initializing Neural MPC...');
-    await this.loadOrCreateModel();
-    this.startDataCollection();
-    this.startTrainingLoop();
-  }
-
-  async loadOrCreateModel() {
-    try {
-      // Try to load pre-trained model
-      this.model = await tf.loadLayersModel('file://./models/neural-mpc/model.json');
-      this.isTrained = true;
-      console.log('✅ Pre-trained Neural MPC model loaded');
-    } catch (error) {
-      // Create new model
-      console.log('🆕 Creating new Neural MPC model');
-      await this.createModel();
-    }
-  }
-
-  async createModel() {
-    this.model = tf.sequential({
-      layers: [
-        tf.layers.dense({
-          inputShape: [15], // 15 input features
-          units: 64,
-          activation: 'relu'
-        }),
-        tf.layers.dense({
-          units: 128,
-          activation: 'relu'
-        }),
-        tf.layers.dropout({ rate: 0.3 }),
-        tf.layers.dense({
-          units: 64,
-          activation: 'relu'
-        }),
-        tf.layers.dense({
-          units: 5, // 5 output: optimal_current, predicted_temp, voltage, o2_purity, efficiency
-          activation: 'linear'
-        })
-      ]
-    });
-
-    this.model.compile({
-      optimizer: tf.train.adam(0.001),
-      loss: 'meanSquaredError',
-      metrics: ['mae']
-    });
-
-    console.log('✅ Neural MPC model created');
-  }
-
-  async trainModel(trainingData) {
-    if (!this.model || trainingData.length < 100) {
-      console.log('⚠️ Not enough data for training');
-      return;
-    }
-
-    console.log('🎯 Training Neural MPC with', trainingData.length, 'samples...');
-
-    const inputs = [];
-    const targets = [];
-
-    // Prepare training data
-    trainingData.forEach(sample => {
-      inputs.push(this.prepareInputFeatures(sample));
-      targets.push(this.prepareTargetOutput(sample));
-    });
-
-    const inputTensor = tf.tensor2d(inputs);
-    const targetTensor = tf.tensor2d(targets);
-
-    const history = await this.model.fit(inputTensor, targetTensor, {
-      epochs: 50,
-      batchSize: 32,
-      validationSplit: 0.2,
-      verbose: 0,
-      callbacks: {
-        onEpochEnd: (epoch, logs) => {
-          if (epoch % 10 === 0) {
-            console.log(`Epoch ${epoch}: loss = ${logs.loss.toFixed(4)}`);
-          }
-        }
-      }
-    });
-
-    this.trainingHistory.push(history);
-    this.isTrained = true;
-
-    // Cleanup
-    inputTensor.dispose();
-    targetTensor.dispose();
-
-    console.log('✅ Neural MPC training completed');
-  }
-
-  prepareInputFeatures(data) {
-    // Combine all relevant features for prediction
-    return [
-      data.temperature || 65,
-      data.voltage || 38,
-      data.current || 150,
-      data.o2Purity || 99.5,
-      data.productionRate || 30,
-      data.weather?.temperature || 25,
-      data.weather?.humidity || 60,
-      data.tariff?.tariff || 18.69,
-      data.demand?.currentDemand || 50,
-      data.demand?.predictedDemand || 55,
-      new Date().getHours() / 24, // Time of day
-      new Date().getDay() / 7,    // Day of week
-      data.battery || 85,
-      data.systemEfficiency || 70,
-      data.powerConsumption || 5.7
-    ];
-  }
-
-  prepareTargetOutput(data) {
-    // Target values for training
-    return [
-      data.optimalCurrent || 150,    // Optimal current
-      data.temperature || 65,        // Predicted temperature
-      data.voltage || 38,            // Predicted voltage
-      data.o2Purity || 99.5,         // Predicted O2 purity
-      data.systemEfficiency || 70    // Predicted efficiency
-    ];
-  }
-
-  async predictOptimalControl(currentState, externalData) {
-    if (!this.isTrained) {
-      console.log('⚠️ Model not trained, returning default control');
-      return this.getDefaultControl(currentState);
-    }
-
-    try {
-      const inputFeatures = this.prepareInputFeatures({
-        ...currentState,
-        ...externalData
-      });
-
-      const inputTensor = tf.tensor2d([inputFeatures]);
-      const prediction = this.model.predict(inputTensor);
-      const results = await prediction.data();
-      
-      inputTensor.dispose();
-      prediction.dispose();
-
-      return {
-        optimalCurrent: results[0],
-        predictedTemperature: results[1],
-        predictedVoltage: results[2],
-        predictedO2Purity: results[3],
-        predictedEfficiency: results[4],
-        confidence: this.calculateConfidence(results),
-        timestamp: new Date()
-      };
-
-    } catch (error) {
-      console.error('❌ Prediction error:', error);
-      return this.getDefaultControl(currentState);
-    }
-  }
-
-  calculateConfidence(predictions) {
-    // Simple confidence calculation based on prediction variance
-    const mean = predictions.reduce((a, b) => a + b) / predictions.length;
-    const variance = predictions.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / predictions.length;
-    return Math.max(0, 100 - variance * 10);
-  }
-
-  getDefaultControl(state) {
-    // Fallback control strategy
-    return {
-      optimalCurrent: 150,
-      predictedTemperature: state.temperature || 65,
-      predictedVoltage: state.voltage || 38,
-      predictedO2Purity: state.o2Purity || 99.5,
-      predictedEfficiency: 70,
-      confidence: 50,
-      timestamp: new Date(),
-      note: 'Using default control strategy'
-    };
-  }
-
-  startDataCollection() {
-    // Collect data from various sources
-    setInterval(() => {
-      this.collectTrainingData();
-    }, 30000); // Every 30 seconds
-  }
-
-  async collectTrainingData() {
-    try {
-      const mqttManager = require('./mqtt');
-      const externalData = mqttManager.getExternalData();
-      
-      // Get current system state from MQTT
-      const systemState = mqttManager.systemState;
-      
-      const trainingSample = {
-        timestamp: new Date(),
-        ...systemState,
-        ...externalData
-      };
-
-      this.sensorDataBuffer.push(trainingSample);
-      
-      // Keep buffer size manageable
-      if (this.sensorDataBuffer.length > 10000) {
-        this.sensorDataBuffer = this.sensorDataBuffer.slice(-5000);
-      }
-
-    } catch (error) {
-      console.error('Error collecting training data:', error);
-    }
-  }
-
-  startTrainingLoop() {
-    // Retrain model periodically with new data
-    setInterval(async () => {
-      if (this.sensorDataBuffer.length >= 500) {
-        await this.trainModel(this.sensorDataBuffer);
+    constructor() {
+        this.model = null;
+        this.isTrained = false;
+        this.trainingHistory = [];
+        this.modelPath = path.join(__dirname, 'models', 'neural-mpc-model');
         
-        // Save model periodically
+        this.initializeModel();
+        this.loadTrainingData();
+    }
+
+    initializeModel() {
+        // Create a comprehensive neural network for MPC
+        this.model = tf.sequential({
+            layers: [
+                // Input layer: [current, voltage, temperature, purity, setpoint, electricity_price]
+                tf.layers.dense({ units: 64, activation: 'relu', inputShape: [6] }),
+                tf.layers.dropout({ rate: 0.2 }),
+                
+                // Hidden layers
+                tf.layers.dense({ units: 128, activation: 'relu' }),
+                tf.layers.batchNormalization(),
+                tf.layers.dropout({ rate: 0.3 }),
+                
+                tf.layers.dense({ units: 64, activation: 'relu' }),
+                tf.layers.dropout({ rate: 0.2 }),
+                
+                tf.layers.dense({ units: 32, activation: 'relu' }),
+                
+                // Output layer: [optimal_current, efficiency, safety_risk, economic_value]
+                tf.layers.dense({ units: 4, activation: 'linear' })
+            ]
+        });
+
+        // Custom loss function for MPC objectives
+        const customLoss = (yTrue, yPred) => {
+            const trackingError = tf.losses.meanSquaredError(yTrue.slice([0, 0], [-1, 1]), yPred.slice([0, 0], [-1, 1]));
+            const safetyPenalty = tf.losses.absoluteDifference(yTrue.slice([0, 2], [-1, 1]), yPred.slice([0, 2], [-1, 1]));
+            const economicReward = tf.neg(tf.losses.meanSquaredError(yTrue.slice([0, 3], [-1, 1]), yPred.slice([0, 3], [-1, 1]));
+            
+            return tf.add(tf.add(trackingError, safetyPenalty), economicReward);
+        };
+
+        this.model.compile({
+            optimizer: tf.train.adam(0.001),
+            loss: customLoss,
+            metrics: ['mae', 'mse']
+        });
+
+        console.log('🧠 Neural MPC model initialized');
+    }
+
+    async trainModel(epochs = 100, batchSize = 32) {
+        if (!this.trainingData || this.trainingData.length === 0) {
+            await this.generateTrainingData();
+        }
+
+        const { inputs, outputs } = this.prepareTrainingData();
+        
+        console.log('🚀 Starting Neural MPC training...');
+        console.log(`📊 Training data: ${inputs.shape[0]} samples`);
+
+        const history = await this.model.fit(inputs, outputs, {
+            epochs: epochs,
+            batchSize: batchSize,
+            validationSplit: 0.2,
+            callbacks: {
+                onEpochEnd: (epoch, logs) => {
+                    this.trainingHistory.push({ epoch, ...logs });
+                    if (epoch % 10 === 0) {
+                        console.log(`Epoch ${epoch}: loss = ${logs.loss.toFixed(4)}, val_loss = ${logs.val_loss.toFixed(4)}`);
+                    }
+                }
+            }
+        });
+
+        this.isTrained = true;
         await this.saveModel();
-      }
-    }, 3600000); // Retrain every hour
-  }
-
-  async saveModel() {
-    if (this.model && this.isTrained) {
-      try {
-        await this.model.save('file://./models/neural-mpc');
-        console.log('💾 Neural MPC model saved');
-      } catch (error) {
-        console.error('Error saving model:', error);
-      }
+        
+        console.log('✅ Neural MPC training completed');
+        return history;
     }
-  }
 
-  // Economic optimization considering KPLC tariffs
-  optimizeForCost(controlSignal, externalData) {
-    const currentTariff = externalData.tariff?.tariff || 18.69;
-    const currentHour = new Date().getHours();
-    
-    // Adjust control based on electricity cost
-    let costFactor = 1.0;
-    
-    if (currentTariff > 20) {
-      // High tariff period - reduce energy consumption
-      costFactor = 0.9;
-    } else if (currentTariff < 15) {
-      // Low tariff period - can increase production
-      costFactor = 1.1;
+    async generateTrainingData() {
+        console.log('📈 Generating training data for Neural MPC...');
+        
+        const numSamples = 10000;
+        const inputs = [];
+        const outputs = [];
+
+        for (let i = 0; i < numSamples; i++) {
+            const input = this.generateRandomInput();
+            const output = await this.calculateOptimalOutput(input);
+            
+            inputs.push(input);
+            outputs.push(output);
+        }
+
+        this.trainingData = { inputs, outputs };
+        this.saveTrainingData();
+        
+        return this.trainingData;
     }
-    
-    return {
-      ...controlSignal,
-      optimalCurrent: controlSignal.optimalCurrent * costFactor,
-      costOptimized: true,
-      tariff: currentTariff,
-      optimizationNote: `Cost optimization applied (factor: ${costFactor.toFixed(2)})`
-    };
-  }
 
-  // Demand-based optimization for hospital needs
-  optimizeForDemand(controlSignal, externalData) {
-    const currentDemand = externalData.demand?.currentDemand || 50;
-    const predictedDemand = externalData.demand?.predictedDemand || 55;
-    
-    // Adjust production based on hospital oxygen demand
-    const demandFactor = predictedDemand / 50; // Normalize to base demand
-    
-    return {
-      ...controlSignal,
-      optimalCurrent: controlSignal.optimalCurrent * demandFactor,
-      demandOptimized: true,
-      currentDemand,
-      predictedDemand,
-      optimizationNote: `Demand optimization applied (factor: ${demandFactor.toFixed(2)})`
-    };
-  }
+    generateRandomInput() {
+        return [
+            // Current (100-200A)
+            Math.random() * 100 + 100,
+            // Voltage (35-42V)
+            Math.random() * 7 + 35,
+            // Temperature (60-80°C)
+            Math.random() * 20 + 60,
+            // Purity (99.0-100%)
+            Math.random() * 1 + 99,
+            // Setpoint (0-100%)
+            Math.random() * 100,
+            // Electricity price (0.08-0.16 $/kWh)
+            Math.random() * 0.08 + 0.08
+        ];
+    }
+
+    async calculateOptimalOutput(input) {
+        // Simulate MPC optimization for training data
+        const [current, voltage, temperature, purity, setpoint, electricityPrice] = input;
+        
+        // Simple optimization logic for training data generation
+        let optimalCurrent = setpoint * 2 + 100; // Basic mapping
+        optimalCurrent = Math.max(100, Math.min(200, optimalCurrent));
+        
+        // Adjust based on constraints
+        if (temperature > 75) optimalCurrent -= 20;
+        if (purity < 99.3) optimalCurrent -= 15;
+        if (electricityPrice > 0.14) optimalCurrent -= 10;
+        
+        const efficiency = 65 + (optimalCurrent - 150) * 0.1;
+        const safetyRisk = this.calculateSafetyRisk(optimalCurrent, temperature, purity);
+        const economicValue = this.calculateEconomicValue(optimalCurrent, electricityPrice);
+        
+        return [optimalCurrent, efficiency, safetyRisk, economicValue];
+    }
+
+    calculateSafetyRisk(current, temperature, purity) {
+        let risk = 0;
+        if (temperature > 70) risk += 0.3;
+        if (temperature > 75) risk += 0.4;
+        if (purity < 99.5) risk += 0.2;
+        if (purity < 99.2) risk += 0.3;
+        if (current > 180) risk += 0.2;
+        
+        return Math.min(1, risk);
+    }
+
+    calculateEconomicValue(current, electricityPrice) {
+        const production = current * 0.00042 * 3600; // kg/h
+        const value = production * 4.0; // $4/kg H2
+        const cost = current * 38 / 1000 * electricityPrice; // $/h
+        return value - cost;
+    }
+
+    prepareTrainingData() {
+        const inputs = tf.tensor2d(this.trainingData.inputs);
+        const outputs = tf.tensor2d(this.trainingData.outputs);
+        return { inputs, outputs };
+    }
+
+    async predict(inputArray) {
+        if (!this.isTrained) {
+            throw new Error('Model not trained. Please train the model first.');
+        }
+
+        const input = tf.tensor2d([inputArray]);
+        const prediction = this.model.predict(input);
+        const result = await prediction.data();
+        
+        tf.dispose([input, prediction]);
+
+        return {
+            optimalCurrent: result[0],
+            efficiency: result[1],
+            safetyRisk: result[2],
+            economicValue: result[3],
+            confidence: this.calculatePredictionConfidence(inputArray)
+        };
+    }
+
+    calculatePredictionConfidence(input) {
+        // Calculate confidence based on input proximity to training data
+        if (!this.trainingData) return 0.8;
+        
+        const distances = this.trainingData.inputs.map(trainInput => 
+            this.euclideanDistance(input, trainInput)
+        );
+        
+        const minDistance = Math.min(...distances);
+        return Math.max(0.1, 1 - minDistance / 10); // Normalize confidence
+    }
+
+    euclideanDistance(a, b) {
+        return Math.sqrt(a.reduce((sum, val, i) => sum + Math.pow(val - b[i], 2), 0));
+    }
+
+    async saveModel() {
+        try {
+            await this.model.save(`file://${this.modelPath}`);
+            console.log('💾 Neural MPC model saved');
+        } catch (error) {
+            console.warn('⚠️ Could not save model:', error.message);
+        }
+    }
+
+    async loadModel() {
+        try {
+            this.model = await tf.loadLayersModel(`file://${this.modelPath}/model.json`);
+            this.isTrained = true;
+            console.log('📥 Neural MPC model loaded');
+        } catch (error) {
+            console.warn('⚠️ Could not load model, needs training:', error.message);
+        }
+    }
+
+    saveTrainingData() {
+        const dataPath = path.join(__dirname, 'data', 'training-data.json');
+        const dir = path.dirname(dataPath);
+        
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        
+        fs.writeFileSync(dataPath, JSON.stringify(this.trainingData, null, 2));
+        console.log('💾 Training data saved');
+    }
+
+    loadTrainingData() {
+        const dataPath = path.join(__dirname, 'data', 'training-data.json');
+        
+        if (fs.existsSync(dataPath)) {
+            this.trainingData = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+            console.log('📥 Training data loaded');
+        }
+    }
+
+    getTrainingHistory() {
+        return this.trainingHistory;
+    }
+
+    getModelSummary() {
+        return {
+            isTrained: this.isTrained,
+            layers: this.model.layers.map(layer => ({
+                type: layer.getClassName(),
+                units: layer.units,
+                activation: layer.activation
+            })),
+            trainingSamples: this.trainingData ? this.trainingData.inputs.length : 0
+        };
+    }
+
+    async realTimeAdaptation(newData) {
+        // Online learning for model adaptation
+        if (!this.isTrained) return;
+
+        const adaptationRate = 0.01;
+        const adaptationSamples = Math.min(100, newData.length);
+        
+        const adaptationData = newData.slice(-adaptationSamples);
+        const { inputs, outputs } = this.prepareAdaptationData(adaptationData);
+
+        await this.model.fit(inputs, outputs, {
+            epochs: 1,
+            batchSize: 32,
+            verbose: 0
+        });
+
+        console.log('🔄 Neural MPC model adapted to new data');
+    }
+
+    prepareAdaptationData(data) {
+        const inputs = data.map(d => d.input);
+        const outputs = data.map(d => d.output);
+        
+        return {
+            inputs: tf.tensor2d(inputs),
+            outputs: tf.tensor2d(outputs)
+        };
+    }
 }
 
-module.exports = new NeuralMPC();
+module.exports = NeuralMPC;
