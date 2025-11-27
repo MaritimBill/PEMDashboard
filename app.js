@@ -2,119 +2,183 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
 const mqtt = require('./mqtt');
-const simulinkBridge = require('./simulink-bridge');
+const MPCComparator = require('./mpc-comparator');
+const NeuralMPC = require('./neural-mpc');
 
-const app = express();
-const server = http.createServer(app);
-const io = socketIo(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
-});
-
-// Middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdnjs.cloudflare.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
-      connectSrc: ["'self'", "ws:", "wss:"]
+class PEMDashboard {
+    constructor() {
+        this.app = express();
+        this.server = http.createServer(this.app);
+        this.io = socketIo(this.server);
+        this.port = process.env.PORT || 3000;
+        
+        // Initialize components
+        this.mqttClient = new mqtt.MQTTClient(this.io);
+        this.mpcComparator = new MPCComparator();
+        this.neuralMPC = new NeuralMPC();
+        
+        this.setupExpress();
+        this.setupSocketIO();
+        this.startDataSimulation();
     }
-  }
-}));
-app.use(compression());
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve static files
-app.use('/css', express.static(path.join(__dirname, 'css')));
-app.use('/js', express.static(path.join(__dirname, 'js')));
+    setupExpress() {
+        this.app.use(express.static(path.join(__dirname, 'public')));
+        this.app.use(express.json());
+        
+        this.app.get('/', (req, res) => {
+            res.sendFile(path.join(__dirname, 'views', 'index.html'));
+        });
 
-// Routes
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
+        this.app.get('/mpc-comparison', (req, res) => {
+            res.sendFile(path.join(__dirname, 'views', 'mpc-comparator.html'));
+        });
 
-app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dashboard.html'));
-});
+        this.app.get('/neural-mpc', (req, res) => {
+            res.sendFile(path.join(__dirname, 'views', 'neural-mpc.html'));
+        });
 
-// API Routes
-app.get('/api/system-status', (req, res) => {
-  res.json({
-    status: 'operational',
-    timestamp: new Date().toISOString(),
-    hospital: 'Kenyatta National Hospital',
-    location: 'Nairobi, Kenya',
-    version: '2.0.0'
-  });
-});
+        // API endpoints
+        this.app.post('/api/mpc/control', (req, res) => {
+            this.handleMPCControl(req.body, res);
+        });
 
-// Socket.io for real-time communication
-io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
-  
-  // Send initial system data
-  socket.emit('system-data', {
-    temperature: 65.2,
-    voltage: 38.1,
-    current: 150.5,
-    o2Purity: 99.6,
-    productionRate: 30,
-    battery: 85,
-    mode: 'MPC'
-  });
+        this.app.get('/api/system/status', (req, res) => {
+            res.json(this.getSystemStatus());
+        });
 
-  // Handle control commands
-  socket.on('control-command', (data) => {
-    console.log('Control command received:', data);
-    // Forward to Arduino via MQTT
-    mqtt.publishControlCommand(data);
-    
-    // Send to Simulink bridge
-    simulinkBridge.sendCommand(data);
-  });
+        this.app.post('/api/neural/train', async (req, res) => {
+            try {
+                await this.neuralMPC.trainModel();
+                res.json({ success: true, message: 'Neural MPC model trained successfully' });
+            } catch (error) {
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+    }
 
-  socket.on('set-mode', (data) => {
-    console.log('Mode change:', data);
-    mqtt.publishModeChange(data);
-  });
+    setupSocketIO() {
+        this.io.on('connection', (socket) => {
+            console.log('Client connected:', socket.id);
 
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
-  });
-});
+            socket.on('mpc-command', (data) => {
+                this.handleMPCCommand(data, socket);
+            });
 
-// Initialize modules
-mqtt.initialize(io);
-simulinkBridge.initialize(io);
+            socket.on('neural-prediction', (data) => {
+                this.handleNeuralPrediction(data, socket);
+            });
 
-// Error handling
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
-});
+            socket.on('disconnect', () => {
+                console.log('Client disconnected:', socket.id);
+            });
+        });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`
-  🏥 PEM Electrolysis System - Kenyatta National Hospital
-  ==================================================
-  📡 Server running on port ${PORT}
-  🌐 Dashboard: http://localhost:${PORT}
-  📊 Real-time monitoring active
-  🤖 MPC Controller: Online
-  🔗 MQTT Bridge: Connected
-  ⚡ Simulink Integration: Ready
-  `);
-});
+        // Broadcast system data every second
+        setInterval(() => {
+            const systemData = this.generateSystemData();
+            this.io.emit('system-update', systemData);
+        }, 1000);
+    }
 
-module.exports = app;
+    generateSystemData() {
+        const timestamp = new Date().toISOString();
+        
+        return {
+            timestamp,
+            production: {
+                h2_rate: 0.042 + Math.random() * 0.01,
+                o2_rate: 0.021 + Math.random() * 0.005,
+                current: 150 + Math.random() * 10,
+                voltage: 38 + Math.random() * 2,
+                efficiency: 65 + Math.random() * 5
+            },
+            storage: {
+                h2_level: 50 + Math.random() * 20,
+                o2_level: 50 + Math.random() * 20,
+                pressure: 30 + Math.random() * 5
+            },
+            safety: {
+                temperature: 65 + Math.random() * 5,
+                purity: 99.5 + Math.random() * 0.3,
+                status: 'NORMAL'
+            },
+            economics: {
+                electricity_cost: 0.12 + Math.random() * 0.02,
+                production_cost: 2.5 + Math.random() * 0.3,
+                value_generated: 5.2 + Math.random() * 0.4
+            }
+        };
+    }
+
+    async handleMPCControl(data, res) {
+        try {
+            const mpcType = data.mpcType || 'HE_NMPC';
+            const result = await this.mpcComparator.computeControl(mpcType, data);
+            
+            // Send control signal to Arduino via MQTT
+            await this.mqttClient.publishControlSignal(result);
+            
+            res.json({
+                success: true,
+                mpcType,
+                optimal_current: result.optimalCurrent,
+                performance: result.performance
+            });
+        } catch (error) {
+            res.status(500).json({ success: false, error: error.message });
+        }
+    }
+
+    handleMPCCommand(data, socket) {
+        this.mpcComparator.evaluateMPC(data.scenario)
+            .then(results => {
+                socket.emit('mpc-results', results);
+            })
+            .catch(error => {
+                socket.emit('mpc-error', { error: error.message });
+            });
+    }
+
+    async handleNeuralPrediction(data, socket) {
+        try {
+            const prediction = await this.neuralMPC.predict(data.inputs);
+            socket.emit('neural-results', prediction);
+        } catch (error) {
+            socket.emit('neural-error', { error: error.message });
+        }
+    }
+
+    getSystemStatus() {
+        return {
+            status: 'OPERATIONAL',
+            mode: 'AUTO',
+            uptime: process.uptime(),
+            connections: this.io.engine.clientsCount,
+            lastUpdate: new Date().toISOString()
+        };
+    }
+
+    startDataSimulation() {
+        // Simulate real-time data updates
+        setInterval(() => {
+            const comparisonData = this.mpcComparator.generateComparisonData();
+            this.io.emit('mpc-comparison-update', comparisonData);
+        }, 2000);
+    }
+
+    start() {
+        this.server.listen(this.port, () => {
+            console.log(`🏭 PEM Electrolyzer Dashboard running on port ${this.port}`);
+            console.log(`📊 MPC Comparator: http://localhost:${this.port}/mpc-comparison`);
+            console.log(`🧠 Neural MPC: http://localhost:${this.port}/neural-mpc`);
+        });
+    }
+}
+
+// Start the dashboard
+const dashboard = new PEMDashboard();
+dashboard.start();
+
+module.exports = PEMDashboard;
