@@ -1,34 +1,29 @@
 {
-  "name": "pem-electrolysis-dashboard",
+  "name": "pem-electrolyzer-dashboard",
   "version": "1.0.0",
-  "description": "Professional PEM Electrolysis Monitoring & Control System for Kenyatta National Hospital",
+  "description": "Advanced MPC Dashboard for PEM Electrolyzer Control",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "dev": "nodemon app.js"
+    "dev": "nodemon app.js",
+    "train-neural": "node neural-mpc.js --train"
   },
   "dependencies": {
     "express": "^4.18.2",
     "socket.io": "^4.7.2",
     "mqtt": "^4.3.7",
     "axios": "^1.4.0",
-    "cors": "^2.8.5",
-    "helmet": "^7.0.0",
-    "compression": "^1.7.4",
-    "moment": "^2.29.4",
-    "node-cron": "^3.0.2"
+    "@tensorflow/tfjs": "^4.10.0",
+    "@tensorflow/tfjs-node": "^4.10.0",
+    "mathjs": "^11.8.0",
+    "csv-parser": "^3.0.0",
+    "node-cron": "^3.0.2",
+    "winston": "^3.10.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "nodemon": "^2.0.22"
   },
-  "keywords": [
-    "pem",
-    "electrolysis",
-    "mpc",
-    "hospital",
-    "oxygen",
-    "kenya"
-  ],
-  "author": "KNH Engineering Team",
+  "keywords": ["mpc", "pem", "electrolyzer", "control", "neural-network"],
+  "author": "Bill Maritim",
   "license": "MIT"
 }
