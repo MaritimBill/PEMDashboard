@@ -187,3 +187,140 @@ class MPCAlgorithms {
     const powerCost = current * state.voltage * 0.018; // KPLC cost approximation
     const tempCost = Math.max(0, state.temperature - 75) * 10;
     const purityCost = Math.max(0, 99.5 - state.o2Purity) * 50;
+    
+    return powerCost + tempCost + purityCost;
+  }
+
+  estimateUncertainty(state, externalData) {
+    // Estimate system uncertainty based on various factors
+    let uncertainty = 0.1; // Base uncertainty
+    
+    if (externalData.weather) {
+      uncertainty += externalData.weather.humidity / 200; // Humidity effect
+    }
+    
+    if (state.temperature > 75) {
+      uncertainty += 0.2; // High temperature uncertainty
+    }
+    
+    if (state.o2Purity < 99.3) {
+      uncertainty += 0.15; // Purity issues increase uncertainty
+    }
+    
+    return Math.min(uncertainty, 0.8);
+  }
+
+  initializePopulation(size, constraints) {
+    const population = [];
+    for (let i = 0; i < size; i++) {
+      population.push({
+        current: constraints.minCurrent + Math.random() * (constraints.maxCurrent - constraints.minCurrent),
+        temperature: 65 + Math.random() * 15,
+        voltage: 36 + Math.random() * 6
+      });
+    }
+    return population;
+  }
+
+  evaluateFitness(solution, currentState, externalData) {
+    // Multi-objective fitness function
+    const powerEfficiency = 1 / (solution.current * currentState.voltage / 1000);
+    const tempSafety = 1 / (1 + Math.max(0, solution.temperature - 75));
+    const purityQuality = currentState.o2Purity / 100;
+    const costEfficiency = 1 / this.calculateCostFunction(solution.current, currentState, {});
+    
+    return powerEfficiency * 0.3 + tempSafety * 0.3 + purityQuality * 0.2 + costEfficiency * 0.2;
+  }
+
+  evolvePopulation(population, bestSolution) {
+    // Simple evolutionary operations
+    population.forEach((individual, index) => {
+      if (Math.random() < 0.8) { // Crossover probability
+        individual.current = 0.8 * individual.current + 0.2 * bestSolution.current;
+      }
+      
+      if (Math.random() < 0.1) { // Mutation probability
+        individual.current += (Math.random() - 0.5) * 20;
+      }
+    });
+  }
+
+  calculateTotalCost(current, prediction, externalData) {
+    const powerCost = current * prediction.predictedVoltage * (externalData.tariff?.tariff || 18.69) / 1000;
+    const efficiencyCost = (100 - prediction.predictedEfficiency) * 0.1;
+    const safetyCost = Math.max(0, prediction.predictedTemperature - 75) * 10;
+    
+    return powerCost + efficiencyCost + safetyCost;
+  }
+
+  isFeasible(current, constraints) {
+    return current >= constraints.minCurrent && 
+           current <= constraints.maxCurrent;
+  }
+
+  // Compare all MPC algorithms
+  async compareAllAlgorithms(currentState, constraints, externalData) {
+    console.log('📊 Comparing all MPC algorithms...');
+    
+    const results = {};
+    const startTime = Date.now();
+    
+    for (const [name, algorithm] of Object.entries(this.algorithms)) {
+      try {
+        const algoStart = Date.now();
+        results[name] = await algorithm(currentState, constraints, externalData);
+        results[name].computationTime = Date.now() - algoStart;
+      } catch (error) {
+        console.error(`Error in ${name}:`, error);
+        results[name] = { error: error.message };
+      }
+    }
+    
+    return {
+      timestamp: new Date(),
+      totalComputationTime: Date.now() - startTime,
+      algorithms: results,
+      recommendations: this.generateRecommendations(results)
+    };
+  }
+
+  generateRecommendations(results) {
+    const scores = {};
+    
+    Object.entries(results).forEach(([name, result]) => {
+      if (!result.error) {
+        scores[name] = this.calculateOverallScore(result);
+      }
+    });
+    
+    const bestAlgorithm = Object.keys(scores).reduce((a, b) => 
+      scores[a] > scores[b] ? a : b
+    );
+    
+    return {
+      bestAlgorithm,
+      scores,
+      recommendation: `Use ${bestAlgorithm} for optimal performance in current conditions`
+    };
+  }
+
+  calculateOverallScore(result) {
+    const weights = {
+      performance: 0.3,
+      stability: 0.25,
+      computationTime: 0.2,
+      energyEfficiency: 0.15,
+      costSaving: 0.1
+    };
+    
+    return (
+      (result.performance || 70) * weights.performance +
+      (result.stability || 70) * weights.stability +
+      (100 - Math.min(result.computationTime / 100, 1) * 100) * weights.computationTime +
+      (result.predictedEfficiency || 70) * weights.energyEfficiency +
+      (result.costSaving || 70) * weights.costSaving
+    );
+  }
+}
+
+module.exports = new MPCAlgorithms();
