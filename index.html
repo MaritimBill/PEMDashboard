@@ -1,0 +1,72 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KNH MPC Comparison Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .mpc-card { margin: 10px; padding: 15px; border-radius: 8px; color: white; }
+        .he-nmpc { background: #FF6B6B; }
+        .standard { background: #4ECDC4; }
+        .mixed-integer { background: #45B7D1; }
+        .stochastic { background: #96CEB4; }
+        .hempc { background: #FFEAA7; color: #333; }
+        .ranking { font-size: 18px; font-weight: bold; margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <h1>🏥 KNH MPC Algorithm Comparison</h1>
+        
+        <div class="controls">
+            <button onclick="runMPCComparison()">Run MPC Comparison</button>
+            <button onclick="startRealTimeMonitoring()">Start Real-time Monitoring</button>
+        </div>
+
+        <div class="real-data">
+            <h3>📊 Real Kenya Data</h3>
+            <div id="weather-data">Weather: Loading...</div>
+            <div id="electricity-data">Electricity: Loading...</div>
+            <div id="hospital-data">Hospital Demand: Loading...</div>
+        </div>
+
+        <div class="mpc-ranking">
+            <h3>🏆 MPC Performance Ranking</h3>
+            <div id="ranking-list"></div>
+        </div>
+
+        <div class="mpc-comparison">
+            <div class="mpc-card he-nmpc">
+                <h4>HE-NMPC</h4>
+                <div class="performance"></div>
+            </div>
+            <div class="mpc-card standard">
+                <h4>Standard MPC</h4>
+                <div class="performance"></div>
+            </div>
+            <div class="mpc-card mixed-integer">
+                <h4>Mixed-Integer MPC</h4>
+                <div class="performance"></div>
+            </div>
+            <div class="mpc-card stochastic">
+                <h4>Stochastic MPC</h4>
+                <div class="performance"></div>
+            </div>
+            <div class="mpc-card hempc">
+                <h4>HEMPC</h4>
+                <div class="performance"></div>
+            </div>
+        </div>
+
+        <div class="charts">
+            <canvas id="efficiencyChart" width="400" height="200"></canvas>
+            <canvas id="costChart" width="400" height="200"></canvas>
+            <canvas id="performanceChart" width="400" height="200"></canvas>
+        </div>
+    </div>
+
+    <script src="/js/mpc-dashboard.js"></script>
+</body>
+</html>
