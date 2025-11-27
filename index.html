@@ -1,404 +1,249 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PEM Electrolysis Control System - Kenyatta National Hospital</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.css" rel="stylesheet">
-    <link href="main.css" rel="stylesheet">
-    <link href="components.css" rel="stylesheet">
+    <title>PEM Electrolyzer MPC Dashboard</title>
+    <link rel="stylesheet" href="main.css">
+    <link rel="stylesheet" href="components.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.2/dist/socket.io.min.js"></script>
 </head>
 <body>
-    <div class="dashboard-container">
-        <!-- Header -->
-        <header class="dashboard-header">
-            <div class="hospital-brand">
-                <div class="hospital-logo">
-                    <i class="fas fa-hospital"></i>
+    <div class="dashboard">
+        <div class="dashboard-container">
+            <!-- Header Section -->
+            <header class="dashboard-header">
+                <div class="header-title">
+                    <h1>🏭 PEM Electrolyzer Control System</h1>
+                    <div class="subtitle">Advanced MPC Dashboard with Real-time Monitoring</div>
                 </div>
-                <div class="hospital-info">
-                    <h1>Kenyatta National Hospital</h1>
-                    <p class="subtitle">PEM Electrolysis Control & Monitoring System</p>
+                <div class="status-indicators">
+                    <div class="status-badge status-normal" id="system-status">OPERATIONAL</div>
+                    <div class="status-badge status-normal" id="connection-status">CONNECTED</div>
+                    <div id="current-time" class="time-display">--:--:--</div>
                 </div>
-            </div>
-            <div class="header-controls">
-                <div class="connection-status" id="connectionStatus">
-                    <i class="fas fa-circle"></i>
-                    <span>Connecting...</span>
-                </div>
-            </div>
-        </header>
+            </header>
 
-        <!-- System Status Banner -->
-        <div class="system-status-banner">
-            <div class="system-info">
-                <h3 class="mb-1">
-                    <i class="fas fa-shield-alt me-2"></i>
-                    System Status: <span id="systemStatus">INITIALIZING</span>
-                </h3>
-                <p class="mb-0">Mode: <strong id="systemMode">STARTUP</strong></p>
-            </div>
-            <div class="status-indicators">
-                <div class="status-item">
-                    <i class="fas fa-microchip"></i>
-                    <span>Controller: Online</span>
+            <!-- Real-time Data Indicators -->
+            <section class="data-indicators">
+                <div class="indicator">
+                    <div class="indicator-label">H₂ Production</div>
+                    <div class="indicator-value" id="h2-production">0.0</div>
+                    <div class="indicator-unit">L/h</div>
                 </div>
-                <div class="status-item">
-                    <i class="fas fa-brain"></i>
-                    <span>MPC: Active</span>
+                <div class="indicator">
+                    <div class="indicator-label">O₂ Production</div>
+                    <div class="indicator-value" id="o2-production">0.0</div>
+                    <div class="indicator-unit">L/h</div>
                 </div>
-                <div class="status-item">
-                    <i class="fas fa-database"></i>
-                    <span>Data Logging: Enabled</span>
+                <div class="indicator">
+                    <div class="indicator-label">Stack Current</div>
+                    <div class="indicator-value" id="stack-current">0.0</div>
+                    <div class="indicator-unit">A</div>
                 </div>
-            </div>
-        </div>
+                <div class="indicator">
+                    <div class="indicator-label">Stack Voltage</div>
+                    <div class="indicator-value" id="stack-voltage">0.0</div>
+                    <div class="indicator-unit">V</div>
+                </div>
+                <div class="indicator">
+                    <div class="indicator-label">Temperature</div>
+                    <div class="indicator-value" id="cell-temperature">0.0</div>
+                    <div class="indicator-unit">°C</div>
+                </div>
+                <div class="indicator">
+                    <div class="indicator-label">Efficiency</div>
+                    <div class="indicator-value" id="system-efficiency">0.0</div>
+                    <div class="indicator-unit">%</div>
+                </div>
+            </section>
 
-        <!-- Control Panel -->
-        <section class="control-panel">
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="control-section">
-                        <h3 class="section-title">
-                            <i class="fas fa-cogs"></i>
-                            System Control
-                        </h3>
-                        <div class="btn-group-custom">
-                            <button class="btn-custom btn-success" id="startSystem">
-                                <i class="fas fa-play"></i>
-                                Start System
-                            </button>
-                            <button class="btn-custom btn-warning" id="stopSystem">
-                                <i class="fas fa-stop"></i>
-                                Stop System
-                            </button>
-                            <button class="btn-custom btn-danger" id="emergencyStop">
-                                <i class="fas fa-exclamation-triangle"></i>
-                                Emergency Stop
-                            </button>
-                        </div>
-                    </div>
+            <!-- Navigation Tabs -->
+            <nav class="nav-tabs">
+                <button class="nav-tab active" data-tab="overview">Overview</button>
+                <button class="nav-tab" data-tab="mpc-control">MPC Control</button>
+                <button class="nav-tab" data-tab="neural-mpc">Neural MPC</button>
+                <button class="nav-tab" data-tab="economic">Economic Analysis</button>
+                <button class="nav-tab" data-tab="safety">Safety Monitoring</button>
+            </nav>
 
-                    <div class="control-section">
-                        <h3 class="section-title">
-                            <i class="fas fa-sliders-h"></i>
-                            Operation Mode
-                        </h3>
-                        <div class="btn-group-custom">
-                            <button class="btn-custom btn-outline mode-btn active" data-mode="MPC">
-                                <i class="fas fa-brain"></i>
-                                MPC Control
-                            </button>
-                            <button class="btn-custom btn-outline mode-btn" data-mode="AUTO">
-                                <i class="fas fa-robot"></i>
-                                Auto Mode
-                            </button>
-                            <button class="btn-custom btn-outline mode-btn" data-mode="MANUAL">
-                                <i class="fas fa-hand-paper"></i>
-                                Manual Mode
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <div class="control-section">
-                        <h3 class="section-title">
-                            <i class="fas fa-tachometer-alt"></i>
-                            Production Control
-                        </h3>
-                        <div class="slider-container">
-                            <div class="slider-header">
-                                <span>Production Rate</span>
-                                <span class="slider-value" id="productionValue">30%</span>
+            <!-- Main Content Grid -->
+            <main class="dashboard-content">
+                <!-- Overview Tab -->
+                <div class="tab-content active" id="overview-tab">
+                    <div class="dashboard-grid">
+                        <!-- Production Chart -->
+                        <div class="grid-item full-width">
+                            <h3>Production Monitoring</h3>
+                            <div class="chart-container">
+                                <canvas id="production-chart"></canvas>
                             </div>
-                            <div class="slider-track">
-                                <div class="slider-fill" style="width: 30%;"></div>
-                                <div class="slider-thumb" style="left: 30%;"></div>
-                            </div>
-                            <input type="range" 
-                                   class="form-range" 
-                                   id="productionSlider" 
-                                   min="0" 
-                                   max="100" 
-                                   value="30"
-                                   step="1">
                         </div>
-                    </div>
 
-                    <div class="control-section">
-                        <h3 class="section-title">
-                            <i class="fas fa-bolt"></i>
-                            Current Settings
-                        </h3>
-                        <div class="row">
-                            <div class="col-6">
-                                <div class="metric-card">
-                                    <div class="metric-title">Setpoint</div>
-                                    <div class="metric-value" id="currentSetpoint">150 A</div>
+                        <!-- MPC Performance -->
+                        <div class="grid-item">
+                            <h3>MPC Performance</h3>
+                            <div class="mpc-performance">
+                                <div class="performance-card">
+                                    <div class="performance-label">HE-NMPC Score</div>
+                                    <div class="performance-value" id="he-nmpc-score">0.0</div>
                                 </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="metric-card">
-                                    <div class="metric-title">Applied</div>
-                                    <div class="metric-value" id="currentApplied">150 A</div>
+                                <div class="performance-card">
+                                    <div class="performance-label">Computation Time</div>
+                                    <div class="performance-value" id="computation-time">0</div>
+                                    <div class="performance-label">ms</div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </section>
 
-        <!-- Real-time Metrics -->
-        <div class="metrics-grid">
-            <div class="metric-card">
-                <div class="metric-header">
-                    <div class="metric-title">Cell Temperature</div>
-                    <div class="metric-icon bg-danger">
-                        <i class="fas fa-thermometer-half"></i>
-                    </div>
-                </div>
-                <div class="metric-value" id="temperatureValue">-- °C</div>
-                <div class="metric-trend trend-up">
-                    <i class="fas fa-arrow-up"></i>
-                    <span>Stable</span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="metric-header">
-                    <div class="metric-title">Stack Voltage</div>
-                    <div class="metric-icon bg-success">
-                        <i class="fas fa-bolt"></i>
-                    </div>
-                </div>
-                <div class="metric-value" id="voltageValue">-- V</div>
-                <div class="metric-trend trend-down">
-                    <i class="fas fa-arrow-down"></i>
-                    <span>Normal</span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="metric-header">
-                    <div class="metric-title">Stack Current</div>
-                    <div class="metric-icon bg-info">
-                        <i class="fas fa-current"></i>
-                    </div>
-                </div>
-                <div class="metric-value" id="currentValue">-- A</div>
-                <div class="metric-trend trend-up">
-                    <i class="fas fa-arrow-up"></i>
-                    <span>Optimal</span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="metric-header">
-                    <div class="metric-title">O₂ Purity</div>
-                    <div class="metric-icon bg-primary">
-                        <i class="fas fa-wind"></i>
-                    </div>
-                </div>
-                <div class="metric-value" id="purityValue">-- %</div>
-                <div class="metric-trend trend-up">
-                    <i class="fas fa-arrow-up"></i>
-                    <span>Excellent</span>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="metric-header">
-                    <div class="metric-title">System Efficiency</div>
-                    <div class="metric-icon bg-warning">
-                        <i class="fas fa-percentage"></i>
-                    </div>
-                </div>
-                <div class="metric-value" id="efficiencyValue">-- %</div>
-                <div class="progress">
-                    <div class="progress-bar" style="width: 70%;"></div>
-                </div>
-            </div>
-
-            <div class="metric-card">
-                <div class="metric-header">
-                    <div class="metric-title">Battery Level</div>
-                    <div class="metric-icon bg-secondary">
-                        <i class="fas fa-battery-three-quarters"></i>
-                    </div>
-                </div>
-                <div class="metric-value" id="batteryValue">-- %</div>
-                <div class="progress">
-                    <div class="progress-bar" style="width: 85%;"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Charts Section -->
-        <div class="row">
-            <div class="col-lg-8">
-                <div class="chart-section">
-                    <div class="chart-header">
-                        <h3 class="chart-title">System Overview</h3>
-                        <div class="chart-controls">
-                            <button class="btn-custom btn-outline btn-sm">
-                                <i class="fas fa-sync-alt"></i>
-                                Refresh
-                            </button>
+                        <!-- System Status -->
+                        <div class="grid-item">
+                            <h3>System Status</h3>
+                            <div class="safety-panel safety-normal" id="safety-panel">
+                                <div class="safety-header">
+                                    <div class="safety-title">Safety Status</div>
+                                    <div class="safety-status status-normal" id="safety-status">NORMAL</div>
+                                </div>
+                                <div class="safety-metrics">
+                                    <div class="safety-metric">
+                                        <span>Temperature:</span>
+                                        <span id="safety-temp">65°C</span>
+                                    </div>
+                                    <div class="safety-metric">
+                                        <span>Purity:</span>
+                                        <span id="safety-purity">99.5%</span>
+                                    </div>
+                                    <div class="safety-metric">
+                                        <span>Voltage:</span>
+                                        <span id="safety-voltage">38V</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="systemOverviewChart"></canvas>
-                    </div>
-                </div>
-            </div>
 
-            <div class="col-lg-4">
-                <div class="chart-section">
-                    <div class="chart-header">
-                        <h3 class="chart-title">Energy Distribution</h3>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="efficiencyChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
+                        <!-- Control Panel -->
+                        <div class="grid-item">
+                            <h3>Control Panel</h3>
+                            <div class="control-panel">
+                                <div class="control-group">
+                                    <label class="control-label">Production Setpoint (%)</label>
+                                    <div class="slider-container">
+                                        <input type="range" class="slider" id="production-setpoint" 
+                                               min="0" max="100" value="50" step="1">
+                                        <span id="setpoint-value">50%</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="control-group">
+                                    <label class="control-label">Control Mode</label>
+                                    <select class="control-input" id="control-mode">
+                                        <option value="AUTO">Auto Mode</option>
+                                        <option value="MANUAL">Manual Mode</option>
+                                        <option value="MPC">MPC Control</option>
+                                        <option value="HE_NMPC">HE-NMPC</option>
+                                    </select>
+                                </div>
 
-        <!-- Production Metrics -->
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <div class="chart-section">
-                    <div class="chart-header">
-                        <h3 class="chart-title">Gas Production</h3>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="productionChart"></canvas>
-                    </div>
-                    <div class="row text-center mt-3">
-                        <div class="col-6">
-                            <div class="metric-value" id="o2Production">-- L/h</div>
-                            <div class="metric-title">O₂ Production</div>
-                        </div>
-                        <div class="col-6">
-                            <div class="metric-value" id="h2Production">-- L/h</div>
-                            <div class="metric-title">H₂ Production</div>
+                                <button class="btn btn-primary" id="start-system">Start System</button>
+                                <button class="btn btn-danger" id="stop-system">Emergency Stop</button>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="col-md-6">
-                <div class="chart-section">
-                    <div class="chart-header">
-                        <h3 class="chart-title">Power Consumption</h3>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="powerChart"></canvas>
-                    </div>
-                    <div class="row text-center mt-3">
-                        <div class="col-6">
-                            <div class="metric-value" id="powerValue">-- kW</div>
-                            <div class="metric-title">Current Power</div>
+                <!-- MPC Control Tab -->
+                <div class="tab-content" id="mpc-control-tab">
+                    <div class="dashboard-grid">
+                        <div class="grid-item full-width">
+                            <h3>MPC Comparison</h3>
+                            <div class="chart-container">
+                                <canvas id="mpc-comparison-chart"></canvas>
+                            </div>
                         </div>
-                        <div class="col-6">
-                            <div class="metric-value" id="energyCost">-- KES/h</div>
-                            <div class="metric-title">Energy Cost</div>
+
+                        <div class="grid-item">
+                            <h3>MPC Performance Metrics</h3>
+                            <div id="mpc-metrics-container">
+                                <!-- MPC metrics will be populated dynamically -->
+                            </div>
+                        </div>
+
+                        <div class="grid-item">
+                            <h3>Real-time MPC Control</h3>
+                            <div class="control-panel">
+                                <div class="control-group">
+                                    <label class="control-label">MPC Type</label>
+                                    <select class="control-input" id="mpc-type-select">
+                                        <option value="DETERMINISTIC_MPC">Deterministic MPC</option>
+                                        <option value="STOCHASTIC_MPC">Stochastic MPC</option>
+                                        <option value="ROBUST_MPC">Robust MPC</option>
+                                        <option value="HYBRID_MPC">Hybrid MPC</option>
+                                        <option value="HE_NMPC">HE-NMPC</option>
+                                    </select>
+                                </div>
+                                
+                                <button class="btn btn-primary" id="run-mpc">Run MPC</button>
+                                <button class="btn btn-success" id="apply-control">Apply Control</button>
+                                
+                                <div id="mpc-result" class="alert alert-info" style="display: none;">
+                                    <!-- MPC results will be shown here -->
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- MPC Comparison Section -->
-        <section class="mpc-comparison">
-            <div class="chart-header">
-                <h3 class="chart-title">
-                    <i class="fas fa-chess-queen"></i>
-                    MPC Algorithm Comparison
-                </h3>
-                <div class="btn-group-custom">
-                    <button class="btn-custom btn-primary" id="runComparison">
-                        <i class="fas fa-play"></i>
-                        Run Comparison
-                    </button>
-                </div>
-            </div>
+                <!-- Additional tab contents would follow similar structure -->
+            </main>
 
-            <div class="row">
-                <div class="col-lg-6">
-                    <div class="chart-container">
-                        <canvas id="mpcComparisonChart"></canvas>
+            <!-- Footer -->
+            <footer class="dashboard-footer">
+                <div class="footer-content">
+                    <p>&copy; 2024 PEM Electrolyzer Control System | HE-NMPC Framework</p>
+                    <div class="system-info">
+                        <span>Uptime: <span id="system-uptime">00:00:00</span></span>
+                        <span>Version: 2.0.0</span>
+                        <span>Last Update: <span id="last-update">--:--:--</span></span>
                     </div>
                 </div>
-                <div class="col-lg-6">
-                    <div class="table-responsive">
-                        <table class="table comparison-table">
-                            <thead>
-                                <tr>
-                                    <th>Algorithm</th>
-                                    <th>Current</th>
-                                    <th>Performance</th>
-                                    <th>Stability</th>
-                                    <th>Speed</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="comparisonTableBody">
-                                <!-- Filled by JavaScript -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mt-3" id="recommendationsContainer">
-                <!-- Recommendations will be inserted here -->
-            </div>
-        </section>
-
-        <!-- Additional Charts -->
-        <div class="row mt-4">
-            <div class="col-lg-6">
-                <div class="chart-section">
-                    <div class="chart-header">
-                        <h3 class="chart-title">Cost Analysis</h3>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="costAnalysisChart"></canvas>
-                    </div>
-                </div>
-            </div>
-            <div class="col-lg-6">
-                <div class="chart-section">
-                    <div class="chart-header">
-                        <h3 class="chart-title">Historical Trends</h3>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="historicalTrendsChart"></canvas>
-                    </div>
-                </div>
-            </div>
+            </footer>
         </div>
     </div>
 
-    <!-- Alerts Container -->
-    <div class="alert-container" id="toastContainer"></div>
-
-    <!-- Scripts -->
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="charts.js"></script>
-    <script src="dashboard.js"></script>
-
+    <script src="mpc-dashboard.js"></script>
     <script>
-        // Initialize the dashboard when the page loads
+        // Initialize dashboard when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🏥 KNH PEM System Dashboard Initialized');
+            const dashboard = new MPCDashboard();
+            
+            // Tab switching functionality
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabName = this.getAttribute('data-tab');
+                    
+                    // Update active tab
+                    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Show corresponding content
+                    document.querySelectorAll('.tab-content').forEach(content => {
+                        content.classList.remove('active');
+                    });
+                    document.getElementById(tabName + '-tab').classList.add('active');
+                });
+            });
+
+            // Update time display
+            function updateTime() {
+                const now = new Date();
+                document.getElementById('current-time').textContent = 
+                    now.toLocaleTimeString();
+            }
+            setInterval(updateTime, 1000);
+            updateTime();
         });
     </script>
 </body>
