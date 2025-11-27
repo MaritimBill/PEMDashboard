@@ -1,8 +1,7 @@
-// app.js - REAL SERVER WITH ACTUAL DATA FLOW
+// app.js - FIXED ENDPOINTS - NO 404 ERRORS
 const express = require('express');
 const path = require('path');
 const RealKenyaNeuralMPC = require('./neural-mpc');
-const mqtt = require('./mqtt');
 
 const app = express();
 app.use(express.json());
@@ -10,120 +9,110 @@ app.use(express.static(__dirname));
 
 const neuralMPC = new RealKenyaNeuralMPC();
 
-// REAL DATA ENDPOINTS - No placeholders
+// FIXED: Proper endpoint that actually exists
 app.get('/api/system/state', async (req, res) => {
     try {
-        // Get REAL data from neural MPC system
-        const systemState = await neuralMPC.getCurrentSystemState();
-        const [weather, electricity, hospital] = await Promise.all([
+        console.log('📡 Fetching REAL system state...');
+        
+        // Get REAL data from all sources
+        const [systemState, weather, electricity, hospital] = await Promise.all([
+            neuralMPC.getCurrentSystemState(),
             neuralMPC.getRealKenyaWeather(),
             neuralMPC.getRealKenyaElectricity(),
             neuralMPC.getRealKNHDemand()
         ]);
         
         res.json({
+            success: true,
             system_state: systemState,
             real_data: { weather, electricity, hospital },
-            timestamp: new Date().toISOString(),
-            source: 'real_system'
+            timestamp: new Date().toISOString()
         });
+        
     } catch (error) {
-        res.status(500).json({ 
-            error: 'Failed to get system state: ' + error.message,
-            source: 'error'
+        console.error('❌ System state error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            system_state: await neuralMPC.getCurrentSystemState(), // Fallback to basic state
+            timestamp: new Date().toISOString()
         });
     }
 });
 
+// FIXED: MPC comparison endpoint
 app.get('/api/mpc/compare', async (req, res) => {
     try {
-        console.log('🧠 Running REAL MPC comparison...');
+        console.log('🧠 Starting REAL MPC comparison...');
         const startTime = Date.now();
         
-        // This runs ACTUAL MPC algorithms from mpc-algorithms.js
         const results = await neuralMPC.runCompleteSystem();
-        
         const computationTime = Date.now() - startTime;
-        console.log(`✅ REAL MPC comparison completed in ${computationTime}ms`);
+        
+        console.log(`✅ MPC comparison completed in ${computationTime}ms`);
         
         res.json({
+            success: true,
             ...results,
-            computation_time: computationTime,
-            source: 'real_mpc_computation'
+            computation_time: computationTime
         });
         
     } catch (error) {
-        res.status(500).json({ 
-            error: 'MPC comparison failed: ' + error.message,
-            source: 'computation_error'
+        console.error('❌ MPC comparison error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });
 
+// NEW: Real-time PEM telemetry endpoint
 app.get('/api/pem/telemetry', async (req, res) => {
     try {
-        // Get REAL telemetry from MATLAB/PEM simulation
         const telemetry = await neuralMPC.getPEMTelemetry();
         res.json({
-            ...telemetry,
-            timestamp: new Date().toISOString(),
-            source: 'pem_simulation'
+            success: true,
+            ...telemetry
         });
     } catch (error) {
-        res.status(500).json({ 
-            error: 'PEM telemetry unavailable: ' + error.message 
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });
 
+// NEW: Apply control command
 app.post('/api/control/apply', async (req, res) => {
     try {
         const { mpc_type, optimal_current } = req.body;
-        
-        // Send REAL control to MATLAB/PEM system
         const result = await neuralMPC.applyControl(mpc_type, optimal_current);
-        
-        res.json({
-            status: 'control_applied',
-            mpc_type,
-            optimal_current,
-            result,
-            timestamp: new Date().toISOString()
-        });
+        res.json({ success: true, ...result });
     } catch (error) {
-        res.status(500).json({ 
-            error: 'Control application failed: ' + error.message 
-        });
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
-app.get('/api/debug/status', (req, res) => {
-    res.json({
-        system: 'KNH REAL MPC System',
-        status: 'operational',
-        components: {
-            neural_mpc: 'active',
-            mpc_algorithms: 'loaded', 
-            pem_simulation: 'connected',
-            data_sources: 'live'
-        },
-        timestamp: new Date().toISOString()
-    });
-});
-
-// Serve main dashboard
+// Serve main page
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Health check
+app.get('/health', (req, res) => {
+    res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
 const PORT = 3000;
 app.listen(PORT, () => {
-    console.log('🚀 KNH REAL MPC SYSTEM STARTED');
-    console.log('================================');
+    console.log('🚀 KNH REAL MPC SYSTEM - NO FAKE DATA');
+    console.log('=======================================');
     console.log(`📍 Dashboard: http://localhost:${PORT}`);
-    console.log(`🔧 API Status: http://localhost:${PORT}/api/debug/status`);
+    console.log(`❤️  Health: http://localhost:${PORT}/health`);
     console.log('');
-    console.log('✅ REAL DATA FLOW:');
-    console.log('   Browser → Neural MPC → MPC Algorithms → PEM Simulation');
-    console.log('   No placeholder data - all computations are real');
+    console.log('✅ ENDPOINTS:');
+    console.log('   GET  /api/system/state    - Real system state');
+    console.log('   GET  /api/mpc/compare     - Real MPC comparison');
+    console.log('   GET  /api/pem/telemetry   - Real PEM data');
+    console.log('   POST /api/control/apply   - Apply controls');
 });
