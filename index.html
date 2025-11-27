@@ -1,250 +1,87 @@
+<!-- Notification Container -->
+<div id="notification-container" class="notification-container"></div>
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PEM Electrolyzer MPC Dashboard</title>
-    <link rel="stylesheet" href="main.css">
-    <link rel="stylesheet" href="components.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.2/dist/socket.io.min.js"></script>
-</head>
-<body>
-    <div class="dashboard">
-        <div class="dashboard-container">
-            <!-- Header Section -->
-            <header class="dashboard-header">
-                <div class="header-title">
-                    <h1>🏭 PEM Electrolyzer Control System</h1>
-                    <div class="subtitle">Advanced MPC Dashboard with Real-time Monitoring</div>
-                </div>
-                <div class="status-indicators">
-                    <div class="status-badge status-normal" id="system-status">OPERATIONAL</div>
-                    <div class="status-badge status-normal" id="connection-status">CONNECTED</div>
-                    <div id="current-time" class="time-display">--:--:--</div>
-                </div>
-            </header>
-
-            <!-- Real-time Data Indicators -->
-            <section class="data-indicators">
-                <div class="indicator">
-                    <div class="indicator-label">H₂ Production</div>
-                    <div class="indicator-value" id="h2-production">0.0</div>
-                    <div class="indicator-unit">L/h</div>
-                </div>
-                <div class="indicator">
-                    <div class="indicator-label">O₂ Production</div>
-                    <div class="indicator-value" id="o2-production">0.0</div>
-                    <div class="indicator-unit">L/h</div>
-                </div>
-                <div class="indicator">
-                    <div class="indicator-label">Stack Current</div>
-                    <div class="indicator-value" id="stack-current">0.0</div>
-                    <div class="indicator-unit">A</div>
-                </div>
-                <div class="indicator">
-                    <div class="indicator-label">Stack Voltage</div>
-                    <div class="indicator-value" id="stack-voltage">0.0</div>
-                    <div class="indicator-unit">V</div>
-                </div>
-                <div class="indicator">
-                    <div class="indicator-label">Temperature</div>
-                    <div class="indicator-value" id="cell-temperature">0.0</div>
-                    <div class="indicator-unit">°C</div>
-                </div>
-                <div class="indicator">
-                    <div class="indicator-label">Efficiency</div>
-                    <div class="indicator-value" id="system-efficiency">0.0</div>
-                    <div class="indicator-unit">%</div>
-                </div>
-            </section>
-
-            <!-- Navigation Tabs -->
-            <nav class="nav-tabs">
-                <button class="nav-tab active" data-tab="overview">Overview</button>
-                <button class="nav-tab" data-tab="mpc-control">MPC Control</button>
-                <button class="nav-tab" data-tab="neural-mpc">Neural MPC</button>
-                <button class="nav-tab" data-tab="economic">Economic Analysis</button>
-                <button class="nav-tab" data-tab="safety">Safety Monitoring</button>
-            </nav>
-
-            <!-- Main Content Grid -->
-            <main class="dashboard-content">
-                <!-- Overview Tab -->
-                <div class="tab-content active" id="overview-tab">
-                    <div class="dashboard-grid">
-                        <!-- Production Chart -->
-                        <div class="grid-item full-width">
-                            <h3>Production Monitoring</h3>
-                            <div class="chart-container">
-                                <canvas id="production-chart"></canvas>
-                            </div>
-                        </div>
-
-                        <!-- MPC Performance -->
-                        <div class="grid-item">
-                            <h3>MPC Performance</h3>
-                            <div class="mpc-performance">
-                                <div class="performance-card">
-                                    <div class="performance-label">HE-NMPC Score</div>
-                                    <div class="performance-value" id="he-nmpc-score">0.0</div>
-                                </div>
-                                <div class="performance-card">
-                                    <div class="performance-label">Computation Time</div>
-                                    <div class="performance-value" id="computation-time">0</div>
-                                    <div class="performance-label">ms</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- System Status -->
-                        <div class="grid-item">
-                            <h3>System Status</h3>
-                            <div class="safety-panel safety-normal" id="safety-panel">
-                                <div class="safety-header">
-                                    <div class="safety-title">Safety Status</div>
-                                    <div class="safety-status status-normal" id="safety-status">NORMAL</div>
-                                </div>
-                                <div class="safety-metrics">
-                                    <div class="safety-metric">
-                                        <span>Temperature:</span>
-                                        <span id="safety-temp">65°C</span>
-                                    </div>
-                                    <div class="safety-metric">
-                                        <span>Purity:</span>
-                                        <span id="safety-purity">99.5%</span>
-                                    </div>
-                                    <div class="safety-metric">
-                                        <span>Voltage:</span>
-                                        <span id="safety-voltage">38V</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Control Panel -->
-                        <div class="grid-item">
-                            <h3>Control Panel</h3>
-                            <div class="control-panel">
-                                <div class="control-group">
-                                    <label class="control-label">Production Setpoint (%)</label>
-                                    <div class="slider-container">
-                                        <input type="range" class="slider" id="production-setpoint" 
-                                               min="0" max="100" value="50" step="1">
-                                        <span id="setpoint-value">50%</span>
-                                    </div>
-                                </div>
-                                
-                                <div class="control-group">
-                                    <label class="control-label">Control Mode</label>
-                                    <select class="control-input" id="control-mode">
-                                        <option value="AUTO">Auto Mode</option>
-                                        <option value="MANUAL">Manual Mode</option>
-                                        <option value="MPC">MPC Control</option>
-                                        <option value="HE_NMPC">HE-NMPC</option>
-                                    </select>
-                                </div>
-
-                                <button class="btn btn-primary" id="start-system">Start System</button>
-                                <button class="btn btn-danger" id="stop-system">Emergency Stop</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- MPC Control Tab -->
-                <div class="tab-content" id="mpc-control-tab">
-                    <div class="dashboard-grid">
-                        <div class="grid-item full-width">
-                            <h3>MPC Comparison</h3>
-                            <div class="chart-container">
-                                <canvas id="mpc-comparison-chart"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="grid-item">
-                            <h3>MPC Performance Metrics</h3>
-                            <div id="mpc-metrics-container">
-                                <!-- MPC metrics will be populated dynamically -->
-                            </div>
-                        </div>
-
-                        <div class="grid-item">
-                            <h3>Real-time MPC Control</h3>
-                            <div class="control-panel">
-                                <div class="control-group">
-                                    <label class="control-label">MPC Type</label>
-                                    <select class="control-input" id="mpc-type-select">
-                                        <option value="DETERMINISTIC_MPC">Deterministic MPC</option>
-                                        <option value="STOCHASTIC_MPC">Stochastic MPC</option>
-                                        <option value="ROBUST_MPC">Robust MPC</option>
-                                        <option value="HYBRID_MPC">Hybrid MPC</option>
-                                        <option value="HE_NMPC">HE-NMPC</option>
-                                    </select>
-                                </div>
-                                
-                                <button class="btn btn-primary" id="run-mpc">Run MPC</button>
-                                <button class="btn btn-success" id="apply-control">Apply Control</button>
-                                
-                                <div id="mpc-result" class="alert alert-info" style="display: none;">
-                                    <!-- MPC results will be shown here -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Additional tab contents would follow similar structure -->
-            </main>
-
-            <!-- Footer -->
-            <footer class="dashboard-footer">
-                <div class="footer-content">
-                    <p>&copy; 2024 PEM Electrolyzer Control System | HE-NMPC Framework</p>
-                    <div class="system-info">
-                        <span>Uptime: <span id="system-uptime">00:00:00</span></span>
-                        <span>Version: 2.0.0</span>
-                        <span>Last Update: <span id="last-update">--:--:--</span></span>
-                    </div>
-                </div>
-            </footer>
+<!-- Training Progress Modal -->
+<div id="training-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h3>🧠 Neural MPC Training</h3>
+        <div class="training-progress">
+            <div class="progress-bar" id="training-progress"></div>
         </div>
+        <div class="progress-text" id="training-progress-text">0%</div>
+        <button class="btn btn-secondary" onclick="document.getElementById('training-modal').style.display='none'">
+            Close
+        </button>
     </div>
+</div>
 
-    <script src="charts.js"></script>
-    <script src="mpc-dashboard.js"></script>
-    <script>
-        // Initialize dashboard when DOM is loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            const dashboard = new MPCDashboard();
-            
-            // Tab switching functionality
-            document.querySelectorAll('.nav-tab').forEach(tab => {
-                tab.addEventListener('click', function() {
-                    const tabName = this.getAttribute('data-tab');
-                    
-                    // Update active tab
-                    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-                    this.classList.add('active');
-                    
-                    // Show corresponding content
-                    document.querySelectorAll('.tab-content').forEach(content => {
-                        content.classList.remove('active');
-                    });
-                    document.getElementById(tabName + '-tab').classList.add('active');
-                });
-            });
+<!-- MPC Result Styles -->
+<style>
+.notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+}
 
-            // Update time display
-            function updateTime() {
-                const now = new Date();
-                document.getElementById('current-time').textContent = 
-                    now.toLocaleTimeString();
-            }
-            setInterval(updateTime, 1000);
-            updateTime();
-        });
-    </script>
-</body>
-</html>
+.notification {
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-width: 300px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.notification-info { background: var(--secondary-color); }
+.notification-success { background: var(--success-color); }
+.notification-warning { background: var(--warning-color); }
+.notification-error { background: var(--danger-color); }
+
+.notification-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.result-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.result-item {
+    padding: 4px 0;
+}
+
+.metric-good { color: var(--success-color); }
+.metric-warning { color: var(--warning-color); }
+.metric-danger { color: var(--danger-color); }
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1001;
+}
+
+.modal-content {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    min-width: 400px;
+    text-align: center;
+}
+</style>
