@@ -1,131 +1,52 @@
-class Dashboard {
+const Chart = require('chart.js');
+const RealTimeMPC = require('./mpc-comparator');
+
+class MPCDashboard {
     constructor() {
-        this.socket = io();
-        this.currentData = null;
         this.charts = {};
-        this.isInitialized = false;
+        this.realTimeData = [];
+        this.mpcComparator = new RealTimeMPC();
+        this.isRunning = false;
         
-        // MPC comparison state
-        this.comparisonData = null;
-        this.selectedAlgorithm = 'HENMPC';
+        this.initializeDashboard();
+    }
+
+    initializeDashboard() {
+        this.createProductionChart();
+        this.createEconomicChart();
+        this.createSafetyChart();
+        this.createMPCComparisonChart();
+        this.startRealTimeUpdates();
+    }
+
+    createProductionChart() {
+        const ctx = document.getElementById('production-chart').getContext('2d');
         
-        this.initialize();
-    }
-
-    initialize() {
-        this.setupEventListeners();
-        this.setupSocketListeners();
-        this.initializeCharts();
-        this.loadInitialData();
-        
-        this.isInitialized = true;
-        console.log('🎛️ Dashboard initialized');
-    }
-
-    setupEventListeners() {
-        // Control buttons
-        document.getElementById('startSystem')?.addEventListener('click', () => this.sendControlCommand('START'));
-        document.getElementById('stopSystem')?.addEventListener('click', () => this.sendControlCommand('STOP'));
-        document.getElementById('emergencyStop')?.addEventListener('click', () => this.emergencyStop());
-
-        // Mode selection
-        document.querySelectorAll('.mode-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.setMode(e.target.dataset.mode));
-        });
-
-        // Slider control
-        const slider = document.getElementById('productionSlider');
-        if (slider) {
-            slider.addEventListener('input', (e) => this.handleSliderChange(e.target.value));
-        }
-
-        // MPC comparison
-        document.getElementById('runComparison')?.addEventListener('click', () => this.runMPCComparison());
-        
-        // Algorithm selection
-        document.querySelectorAll('.algorithm-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => this.selectAlgorithm(e.target.dataset.algorithm));
-        });
-
-        // Refresh data
-        document.getElementById('refreshData')?.addEventListener('click', () => this.refreshData());
-    }
-
-    setupSocketListeners() {
-        // Real-time data updates
-        this.socket.on('real-time-data', (data) => {
-            this.currentData = data;
-            this.updateDashboard(data);
-        });
-
-        // Sensor updates
-        this.socket.on('sensor-update', (data) => {
-            this.updateSensorDisplays(data);
-        });
-
-        // Simulation updates
-        this.socket.on('simulation-update', (data) => {
-            this.updateSimulationDisplays(data);
-        });
-
-        // MPC comparison results
-        this.socket.on('mpc-comparison-results', (data) => {
-            this.comparisonData = data;
-            this.updateMPCComparison(data);
-        });
-
-        // System alerts
-        this.socket.on('system-alert', (alert) => {
-            this.showAlert(alert);
-        });
-
-        // Connection status
-        this.socket.on('connect', () => {
-            this.updateConnectionStatus('connected');
-        });
-
-        this.socket.on('disconnect', () => {
-            this.updateConnectionStatus('disconnected');
-        });
-    }
-
-    initializeCharts() {
-        // Initialize all charts using Chart.js
-        this.initializeTimeSeriesChart();
-        this.initializeMPCComparisonChart();
-        this.initializeEfficiencyChart();
-        this.initializeCostChart();
-    }
-
-    initializeTimeSeriesChart() {
-        const ctx = document.getElementById('timeSeriesChart')?.getContext('2d');
-        if (!ctx) return;
-
-        this.charts.timeSeries = new Chart(ctx, {
+        this.charts.production = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: [],
                 datasets: [
                     {
-                        label: 'Temperature (°C)',
-                        data: [],
-                        borderColor: 'rgb(255, 99, 132)',
-                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                        yAxisID: 'y'
-                    },
-                    {
-                        label: 'Current (A)',
-                        data: [],
-                        borderColor: 'rgb(54, 162, 235)',
-                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
-                        yAxisID: 'y1'
-                    },
-                    {
-                        label: 'Voltage (V)',
+                        label: 'H₂ Production Rate',
                         data: [],
                         borderColor: 'rgb(75, 192, 192)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                        tension: 0.1,
                         yAxisID: 'y'
+                    },
+                    {
+                        label: 'Setpoint',
+                        data: [],
+                        borderColor: 'rgb(255, 99, 132)',
+                        borderDash: [5, 5],
+                        tension: 0.1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Current',
+                        data: [],
+                        borderColor: 'rgb(54, 162, 235)',
+                        yAxisID: 'y1'
                     }
                 ]
             },
@@ -137,41 +58,91 @@ class Dashboard {
                 },
                 scales: {
                     x: {
-                        type: 'time',
-                        time: {
-                            unit: 'minute'
+                        type: 'realtime',
+                        realtime: {
+                            duration: 60000,
+                            refresh: 1000,
+                            delay: 2000
                         }
                     },
                     y: {
                         type: 'linear',
                         display: true,
                         position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Production Rate (L/s)'
+                        }
                     },
                     y1: {
                         type: 'linear',
                         display: true,
                         position: 'right',
-                        grid: {
-                            drawOnChartArea: false,
+                        title: {
+                            display: true,
+                            text: 'Current (A)'
                         },
+                        grid: {
+                            drawOnChartArea: false
+                        }
                     }
                 }
             }
         });
     }
 
-    initializeMPCComparisonChart() {
-        const ctx = document.getElementById('mpcComparisonChart')?.getContext('2d');
-        if (!ctx) return;
-
-        this.charts.mpcComparison = new Chart(ctx, {
-            type: 'radar',
+    createEconomicChart() {
+        const ctx = document.getElementById('economic-chart').getContext('2d');
+        
+        this.charts.economic = new Chart(ctx, {
+            type: 'bar',
             data: {
-                labels: ['Performance', 'Stability', 'Speed', 'Efficiency', 'Cost Saving'],
-                datasets: []
+                labels: ['Energy Cost', 'Degradation', 'H₂ Value', 'Net Value'],
+                datasets: [{
+                    label: 'Economic Breakdown ($/h)',
+                    data: [0, 0, 0, 0],
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.8)',
+                        'rgba(255, 159, 64, 0.8)',
+                        'rgba(75, 192, 192, 0.8)',
+                        'rgba(54, 162, 235, 0.8)'
+                    ]
+                }]
             },
             options: {
                 responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Economic Performance'
+                    }
+                }
+            }
+        });
+    }
+
+    createSafetyChart() {
+        const ctx = document.getElementById('safety-chart').getContext('2d');
+        
+        this.charts.safety = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['Temperature', 'Purity', 'Voltage', 'Current', 'Efficiency'],
+                datasets: [{
+                    label: 'Safety Metrics',
+                    data: [80, 95, 85, 75, 90],
+                    fill: true,
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    pointBackgroundColor: 'rgb(255, 99, 132)'
+                }]
+            },
+            options: {
+                elements: {
+                    line: {
+                        borderWidth: 3
+                    }
+                },
                 scales: {
                     r: {
                         angleLines: {
@@ -185,56 +156,60 @@ class Dashboard {
         });
     }
 
-    initializeEfficiencyChart() {
-        const ctx = document.getElementById('efficiencyChart')?.getContext('2d');
-        if (!ctx) return;
-
-        this.charts.efficiency = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Energy Used', 'System Losses', 'Useful Output'],
-                datasets: [{
-                    data: [70, 20, 10],
-                    backgroundColor: [
-                        'rgb(54, 162, 235)',
-                        'rgb(255, 99, 132)',
-                        'rgb(75, 192, 192)'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                    }
-                }
-            }
-        });
-    }
-
-    initializeCostChart() {
-        const ctx = document.getElementById('costChart')?.getContext('2d');
-        if (!ctx) return;
-
-        this.charts.cost = new Chart(ctx, {
+    createMPCComparisonChart() {
+        const ctx = document.getElementById('mpc-comparison-chart').getContext('2d');
+        
+        this.charts.mpcComparison = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: ['HENMPC', 'Standard', 'MI-MPC', 'Stochastic', 'HEMPC'],
-                datasets: [{
-                    label: 'Cost per hour (KES)',
-                    data: [450, 520, 480, 470, 460],
-                    backgroundColor: 'rgba(153, 102, 255, 0.6)'
-                }]
+                labels: ['DETERMINISTIC', 'STOCHASTIC', 'ROBUST', 'HYBRID', 'HE_NMPC'],
+                datasets: [
+                    {
+                        label: 'Performance Score',
+                        data: [0, 0, 0, 0, 0],
+                        backgroundColor: 'rgba(75, 192, 192, 0.8)',
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Computation Time (ms)',
+                        data: [0, 0, 0, 0, 0],
+                        backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                        yAxisID: 'y1'
+                    }
+                ]
             },
             options: {
                 responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
                 scales: {
-                    y: {
-                        beginAtZero: true,
+                    x: {
                         title: {
                             display: true,
-                            text: 'Cost (KES/hour)'
+                            text: 'MPC Type'
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Performance Score'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Computation Time (ms)'
+                        },
+                        grid: {
+                            drawOnChartArea: false
                         }
                     }
                 }
@@ -242,339 +217,231 @@ class Dashboard {
         });
     }
 
-    updateDashboard(data) {
-        // Update main metrics
-        this.updateMetric('temperatureValue', `${data.temperature?.toFixed(1) || '--'}°C`);
-        this.updateMetric('voltageValue', `${data.voltage?.toFixed(1) || '--'}V`);
-        this.updateMetric('currentValue', `${data.current?.toFixed(1) || '--'}A`);
-        this.updateMetric('purityValue', `${data.o2Purity?.toFixed(1) || '--'}%`);
-        this.updateMetric('productionValue', `${data.productionRate?.toFixed(0) || '--'}%`);
-        this.updateMetric('batteryValue', `${data.battery?.toFixed(0) || '--'}%`);
+    async startRealTimeUpdates() {
+        this.isRunning = true;
         
-        // Update system status
-        this.updateSystemStatus(data.mode, data.state);
-        
-        // Update time series chart
-        this.updateTimeSeriesChart(data);
+        while (this.isRunning) {
+            await this.updateDashboard();
+            await this.delay(1000); // Update every second
+        }
     }
 
-    updateSensorDisplays(data) {
-        // Update specific sensor values with animation
-        this.animateValueChange('temperatureValue', data.temperature, '°C');
-        this.animateValueChange('voltageValue', data.voltage, 'V');
-        this.animateValueChange('currentValue', data.current, 'A');
-        this.animateValueChange('purityValue', data.o2Purity, '%');
-    }
-
-    updateSimulationDisplays(data) {
-        // Update simulation-specific displays
-        this.updateMetric('h2Production', `${data.h2Production?.toFixed(2) || '--'} L/h`);
-        this.updateMetric('o2Production', `${data.o2Production?.toFixed(2) || '--'} L/h`);
-        this.updateMetric('efficiencyValue', `${data.systemEfficiency?.toFixed(1) || '--'}%`);
-        this.updateMetric('powerValue', `${data.powerConsumption?.toFixed(2) || '--'} kW`);
-    }
-
-    updateMPCComparison(data) {
-        if (!data || !data.algorithms) return;
-
-        // Update comparison table
-        this.updateComparisonTable(data.algorithms);
+    async updateDashboard() {
+        const systemData = await this.fetchSystemData();
+        const mpcComparison = await this.fetchMPCComparison();
         
-        // Update radar chart
-        this.updateRadarChart(data.algorithms);
-        
-        // Update recommendations
-        this.updateRecommendations(data.recommendations);
+        this.updateProductionChart(systemData);
+        this.updateEconomicChart(systemData);
+        this.updateSafetyChart(systemData);
+        this.updateMPCComparisonChart(mpcComparison);
+        this.updateStatusPanel(systemData);
     }
 
-    updateComparisonTable(algorithms) {
-        const tableBody = document.getElementById('comparisonTableBody');
-        if (!tableBody) return;
-
-        tableBody.innerHTML = '';
-
-        Object.entries(algorithms).forEach(([name, algo]) => {
-            if (algo.error) return;
-
-            const row = document.createElement('tr');
-            if (name === this.selectedAlgorithm) {
-                row.classList.add('table-primary');
+    async fetchSystemData() {
+        // Simulate fetching data from backend
+        return {
+            timestamp: new Date().toISOString(),
+            production: {
+                h2_rate: 0.042 + Math.random() * 0.01,
+                o2_rate: 0.021 + Math.random() * 0.005,
+                current: 150 + Math.random() * 10,
+                setpoint: 50
+            },
+            economics: {
+                energy_cost: 2.1 + Math.random() * 0.2,
+                degradation_cost: 0.5 + Math.random() * 0.1,
+                h2_value: 4.2 + Math.random() * 0.3,
+                net_value: 1.6 + Math.random() * 0.2
+            },
+            safety: {
+                temperature: 65 + Math.random() * 5,
+                purity: 99.5 + Math.random() * 0.3,
+                voltage: 38 + Math.random() * 2,
+                current: 150 + Math.random() * 10,
+                efficiency: 65 + Math.random() * 5
             }
-
-            row.innerHTML = `
-                <td>${name}</td>
-                <td>${algo.optimalCurrent?.toFixed(1) || '--'} A</td>
-                <td>${algo.performance?.toFixed(1) || '--'}%</td>
-                <td>${algo.stability?.toFixed(1) || '--'}%</td>
-                <td>${algo.computationTime?.toFixed(0) || '--'} ms</td>
-                <td>
-                    <button class="btn btn-sm btn-outline-primary" 
-                            onclick="dashboard.selectAlgorithm('${name}')">
-                        Select
-                    </button>
-                </td>
-            `;
-
-            tableBody.appendChild(row);
-        });
-    }
-
-    updateRadarChart(algorithms) {
-        if (!this.charts.mpcComparison) return;
-
-        const datasets = [];
-        const colors = {
-            HENMPC: 'rgb(255, 99, 132)',
-            STANDARD_MPC: 'rgb(54, 162, 235)',
-            MIXED_INTEGER_MPC: 'rgb(255, 205, 86)',
-            STOCHASTIC_MPC: 'rgb(75, 192, 192)',
-            HEMPC: 'rgb(153, 102, 255)'
         };
-
-        Object.entries(algorithms).forEach(([name, algo]) => {
-            if (algo.error) return;
-
-            datasets.push({
-                label: name,
-                data: [
-                    algo.performance || 70,
-                    algo.stability || 70,
-                    100 - Math.min((algo.computationTime || 50) / 100, 1) * 100,
-                    algo.predictedEfficiency || 70,
-                    algo.costSaving || 70
-                ],
-                backgroundColor: this.hexToRgba(colors[name] || 'rgb(128, 128, 128)', 0.2),
-                borderColor: colors[name] || 'rgb(128, 128, 128)',
-                pointBackgroundColor: colors[name] || 'rgb(128, 128, 128)'
-            });
-        });
-
-        this.charts.mpcComparison.data.datasets = datasets;
-        this.charts.mpcComparison.update();
     }
 
-    updateRecommendations(recommendations) {
-        const container = document.getElementById('recommendationsContainer');
-        if (!container) return;
-
-        container.innerHTML = '';
-
-        if (recommendations && recommendations.bestAlgorithm) {
-            const alert = document.createElement('div');
-            alert.className = 'alert alert-success';
-            alert.innerHTML = `
-                <h5>🎯 Recommended Algorithm: ${recommendations.bestAlgorithm}</h5>
-                <p class="mb-0">${recommendations.recommendation || 'This algorithm provides the best overall performance for current conditions.'}</p>
-            `;
-            container.appendChild(alert);
+    async fetchMPCComparison() {
+        const setpoint = { productionRate: 50 };
+        const results = {};
+        
+        for (const mpcType of ['DETERMINISTIC_MPC', 'STOCHASTIC_MPC', 'ROBUST_MPC', 'HYBRID_MPC', 'HE_NMPC']) {
+            results[mpcType] = await this.mpcComparator.computeControl(mpcType, setpoint);
         }
+        
+        return results;
     }
 
-    updateTimeSeriesChart(data) {
-        if (!this.charts.timeSeries) return;
-
-        const now = new Date();
-        const labels = this.charts.timeSeries.data.labels;
-        const tempData = this.charts.timeSeries.data.datasets[0].data;
-        const currentData = this.charts.timeSeries.data.datasets[1].data;
-        const voltageData = this.charts.timeSeries.data.datasets[2].data;
-
+    updateProductionChart(data) {
+        const chart = this.charts.production;
+        const timestamp = new Date().toLocaleTimeString();
+        
         // Add new data point
-        labels.push(now);
-        tempData.push(data.temperature);
-        currentData.push(data.current);
-        voltageData.push(data.voltage);
-
-        // Keep only last 50 points
-        if (labels.length > 50) {
-            labels.shift();
-            tempData.shift();
-            currentData.shift();
-            voltageData.shift();
-        }
-
-        this.charts.timeSeries.update();
-    }
-
-    updateSystemStatus(mode, state) {
-        const statusElement = document.getElementById('systemStatus');
-        const modeElement = document.getElementById('systemMode');
+        chart.data.labels.push(timestamp);
+        chart.data.datasets[0].data.push(data.production.h2_rate);
+        chart.data.datasets[1].data.push(data.production.setpoint);
+        chart.data.datasets[2].data.push(data.production.current);
         
-        if (statusElement) {
-            statusElement.textContent = state || 'UNKNOWN';
-            statusElement.className = `status-${(state || '').toLowerCase()}`;
+        // Remove old data
+        if (chart.data.labels.length > 50) {
+            chart.data.labels.shift();
+            chart.data.datasets.forEach(dataset => dataset.data.shift());
         }
         
-        if (modeElement) {
-            modeElement.textContent = mode || 'NO MODE';
+        chart.update('none');
+    }
+
+    updateEconomicChart(data) {
+        const chart = this.charts.economic;
+        
+        chart.data.datasets[0].data = [
+            data.economics.energy_cost,
+            data.economics.degradation_cost,
+            data.economics.h2_value,
+            data.economics.net_value
+        ];
+        
+        chart.update();
+    }
+
+    updateSafetyChart(data) {
+        const chart = this.charts.safety;
+        
+        chart.data.datasets[0].data = [
+            data.safety.temperature,
+            data.safety.purity,
+            data.safety.voltage,
+            data.safety.current,
+            data.safety.efficiency
+        ];
+        
+        chart.update();
+    }
+
+    updateMPCComparisonChart(comparisonData) {
+        const chart = this.charts.mpcComparison;
+        const mpcTypes = ['DETERMINISTIC_MPC', 'STOCHASTIC_MPC', 'ROBUST_MPC', 'HYBRID_MPC', 'HE_NMPC'];
+        
+        const performanceScores = mpcTypes.map(type => 
+            comparisonData[type]?.performance.setpointAchievement || 0
+        );
+        
+        const computationTimes = mpcTypes.map(type => 
+            comparisonData[type]?.computationTime || 0
+        );
+        
+        chart.data.datasets[0].data = performanceScores;
+        chart.data.datasets[1].data = computationTimes;
+        
+        chart.update();
+    }
+
+    updateStatusPanel(data) {
+        // Update HTML elements with current status
+        document.getElementById('current-value').textContent = data.production.current.toFixed(1);
+        document.getElementById('voltage-value').textContent = data.safety.voltage.toFixed(1);
+        document.getElementById('temperature-value').textContent = data.safety.temperature.toFixed(1);
+        document.getElementById('purity-value').textContent = data.safety.purity.toFixed(1);
+        document.getElementById('efficiency-value').textContent = data.safety.efficiency.toFixed(1);
+        
+        // Update status indicator
+        const statusIndicator = document.getElementById('status-indicator');
+        if (data.safety.temperature > 75 || data.safety.purity < 99.3) {
+            statusIndicator.className = 'status-warning';
+            statusIndicator.textContent = 'WARNING';
+        } else {
+            statusIndicator.className = 'status-normal';
+            statusIndicator.textContent = 'NORMAL';
         }
     }
 
-    updateConnectionStatus(status) {
-        const indicator = document.getElementById('connectionStatus');
-        if (!indicator) return;
-
-        indicator.textContent = status === 'connected' ? '🟢 Connected' : '🔴 Disconnected';
-        indicator.className = `connection-${status}`;
-    }
-
-    updateMetric(elementId, value) {
-        const element = document.getElementById(elementId);
-        if (element) {
-            element.textContent = value;
-        }
-    }
-
-    animateValueChange(elementId, newValue, unit) {
-        const element = document.getElementById(elementId);
-        if (!element || newValue === undefined) return;
-
-        const oldValue = parseFloat(element.textContent) || 0;
-        const difference = Math.abs(newValue - oldValue);
-
-        if (difference > 0.1) {
-            element.classList.add('value-changing');
-            setTimeout(() => {
-                element.textContent = `${newValue.toFixed(1)}${unit}`;
-                element.classList.remove('value-changing');
-            }, 300);
-        }
-    }
-
-    // Control methods
-    sendControlCommand(command) {
-        this.socket.emit('control-command', {
-            type: 'system_command',
-            command: command,
-            timestamp: new Date()
-        });
+    async handleMPCSelection(mpcType) {
+        const setpoint = this.getCurrentSetpoint();
         
-        this.showToast(`Command sent: ${command}`, 'success');
-    }
-
-    setMode(mode) {
-        this.socket.emit('set-mode', {
-            mode: mode,
-            setpoint: this.currentData?.productionRate || 30,
-            timestamp: new Date()
-        });
-        
-        // Update UI
-        document.querySelectorAll('.mode-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.mode === mode);
-        });
-        
-        this.showToast(`Mode changed to: ${mode}`, 'info');
-    }
-
-    handleSliderChange(value) {
-        this.socket.emit('control-command', {
-            type: 'production_rate',
-            value: parseFloat(value),
-            timestamp: new Date()
-        });
-        
-        this.updateMetric('productionValue', `${value}%`);
-    }
-
-    selectAlgorithm(algorithm) {
-        this.selectedAlgorithm = algorithm;
-        
-        // Update UI
-        document.querySelectorAll('.algorithm-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.algorithm === algorithm);
-        });
-        
-        // Send selection to server
-        this.socket.emit('control-command', {
-            type: 'algorithm_selection',
-            algorithm: algorithm,
-            timestamp: new Date()
-        });
-        
-        this.showToast(`Algorithm selected: ${algorithm}`, 'info');
-    }
-
-    runMPCComparison() {
-        this.socket.emit('control-command', {
-            type: 'run_comparison',
-            timestamp: new Date()
-        });
-        
-        this.showToast('Running MPC algorithm comparison...', 'info');
-    }
-
-    emergencyStop() {
-        if (confirm('Are you sure you want to perform an emergency stop? This will immediately shut down the system.')) {
-            this.socket.emit('control-command', {
-                type: 'emergency_stop',
-                timestamp: new Date()
-            });
+        try {
+            const result = await this.mpcComparator.computeControl(mpcType, setpoint);
+            this.displayMPCResult(result);
             
-            this.showToast('🛑 EMERGENCY STOP ACTIVATED', 'danger');
+            // Send control signal to system
+            await this.sendControlSignal(result.optimalCurrent);
+            
+        } catch (error) {
+            this.displayError(`MPC Control Error: ${error.message}`);
         }
     }
 
-    refreshData() {
-        this.socket.emit('control-command', {
-            type: 'refresh_data',
-            timestamp: new Date()
-        });
+    getCurrentSetpoint() {
+        const slider = document.getElementById('production-setpoint');
+        return { productionRate: parseFloat(slider.value) };
+    }
+
+    displayMPCResult(result) {
+        const resultDiv = document.getElementById('mpc-result');
         
-        this.showToast('Refreshing system data...', 'info');
-    }
-
-    loadInitialData() {
-        // Load any initial data needed
-        this.showToast('Dashboard loaded successfully', 'success');
-    }
-
-    // Utility methods
-    hexToRgba(hex, alpha) {
-        const r = parseInt(hex.slice(4, 6), 16);
-        const g = parseInt(hex.slice(6, 8), 16);
-        const b = parseInt(hex.slice(8, 10), 16);
-        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    }
-
-    showToast(message, type = 'info') {
-        // Simple toast notification
-        const toast = document.createElement('div');
-        toast.className = `alert alert-${type} alert-dismissible fade show`;
-        toast.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        resultDiv.innerHTML = `
+            <h4>MPC Control Result</h4>
+            <p><strong>Type:</strong> ${result.mpcType}</p>
+            <p><strong>Optimal Current:</strong> ${result.optimalCurrent.toFixed(1)} A</p>
+            <p><strong>Performance:</strong> ${result.performance.setpointAchievement.toFixed(1)}%</p>
+            <p><strong>Computation Time:</strong> ${result.computationTime} ms</p>
+            <p><strong>Economic Cost:</strong> $${result.cost.total.toFixed(3)}/h</p>
         `;
-        
-        const container = document.getElementById('toastContainer') || document.body;
-        container.appendChild(toast);
+    }
+
+    displayError(message) {
+        const errorDiv = document.getElementById('error-message');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
         
         setTimeout(() => {
-            toast.remove();
+            errorDiv.style.display = 'none';
         }, 5000);
     }
 
-    showAlert(alert) {
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${alert.priority === 'high' ? 'danger' : 'warning'} alert-dismissible fade show`;
-        alertDiv.innerHTML = `
-            <h5>🚨 ${alert.title || 'System Alert'}</h5>
-            <p class="mb-2">${alert.message}</p>
-            <small>${new Date(alert.timestamp).toLocaleString()}</small>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-        
-        const container = document.getElementById('alertsContainer');
-        if (container) {
-            container.appendChild(alertDiv);
+    async sendControlSignal(current) {
+        // Send control signal to backend/Arduino
+        try {
+            const response = await fetch('/api/mpc/control', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    current: current,
+                    timestamp: new Date().toISOString()
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to send control signal');
+            }
+            
+            console.log(`🔧 Control signal sent: ${current}A`);
+        } catch (error) {
+            console.error('❌ Control signal error:', error);
+            this.displayError(`Control Signal Error: ${error.message}`);
         }
+    }
+
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    stop() {
+        this.isRunning = false;
         
-        // Also show as toast
-        this.showToast(alert.message, alert.priority === 'high' ? 'danger' : 'warning');
+        // Destroy all charts
+        Object.values(this.charts).forEach(chart => {
+            chart.destroy();
+        });
     }
 }
 
 // Initialize dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    window.dashboard = new Dashboard();
+    window.mpcDashboard = new MPCDashboard();
 });
+
+module.exports = MPCDashboard;
