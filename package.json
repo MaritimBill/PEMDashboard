@@ -1,13 +1,34 @@
 {
-  "name": "knh-real-mpc",
+  "name": "pem-electrolysis-dashboard",
   "version": "1.0.0",
+  "description": "Professional PEM Electrolysis Monitoring & Control System for Kenyatta National Hospital",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "dev": "node app.js"
+    "dev": "nodemon app.js"
   },
   "dependencies": {
     "express": "^4.18.2",
-    "mqtt": "^4.3.7"
-  }
+    "socket.io": "^4.7.2",
+    "mqtt": "^4.3.7",
+    "axios": "^1.4.0",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "compression": "^1.7.4",
+    "moment": "^2.29.4",
+    "node-cron": "^3.0.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "pem",
+    "electrolysis",
+    "mpc",
+    "hospital",
+    "oxygen",
+    "kenya"
+  ],
+  "author": "KNH Engineering Team",
+  "license": "MIT"
 }
