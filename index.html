@@ -3,590 +3,403 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KNH Medical Oxygen - REAL MPC System</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        /* INLINE STYLES - No external CSS issues */
-        :root {
-            --primary: #2c5aa0;
-            --success: #28a745;
-            --info: #17a2b8;
-            --warning: #ffc107;
-            --dark: #343a40;
-        }
-        
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body {
-            font-family: 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            color: #2d3748;
-        }
-        
-        .app-container {
-            min-height: 100vh;
-            background: rgba(255, 255, 255, 0.95);
-        }
-        
-        .app-header {
-            background: linear-gradient(135deg, var(--primary) 0%, #1e3d72 100%);
-            color: white;
-            padding: 2rem 0;
-            text-align: center;
-        }
-        
-        .app-header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-        }
-        
-        .main-nav {
-            display: flex;
-            justify-content: center;
-            gap: 2rem;
-            margin-top: 1rem;
-        }
-        
-        .nav-btn {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .nav-btn:hover {
-            background: rgba(255,255,255,0.3);
-        }
-        
-        .main-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-        
-        .dashboard-section {
-            margin-bottom: 3rem;
-        }
-        
-        .dashboard-section h2 {
-            font-size: 1.75rem;
-            margin-bottom: 1.5rem;
-            color: var(--primary);
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 0.5rem;
-        }
-        
-        .status-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-        
-        .status-card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            border-left: 4px solid var(--primary);
-        }
-        
-        .pem-status { border-left-color: var(--success); }
-        .mpc-status { border-left-color: var(--info); }
-        .safety-status { border-left-color: var(--warning); }
-        
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-        
-        .status-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: var(--success);
-        }
-        
-        .metric {
-            display: flex;
-            justify-content: space-between;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid #f1f5f9;
-        }
-        
-        .metric-value {
-            font-weight: bold;
-            font-size: 1.1rem;
-        }
-        
-        .charts-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-        
-        .chart-container {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            height: 300px;
-        }
-        
-        .control-panel {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-        
-        .btn {
-            padding: 0.875rem 1.5rem;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(44, 90, 160, 0.3);
-        }
-        
-        .data-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-        }
-        
-        .data-card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        
-        .mpc-comparison {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            margin-top: 2rem;
-        }
-        
-        .ranking-item {
-            padding: 0.75rem;
-            margin: 0.5rem 0;
-            background: #f8f9fa;
-            border-radius: 6px;
-            border-left: 4px solid var(--primary);
-        }
-        
-        .ranking-1 { border-left-color: gold; background: #fffbf0; }
-        .ranking-2 { border-left-color: silver; background: #f8f9fa; }
-        .ranking-3 { border-left-color: #cd7f32; background: #fef8f0; }
-        
-        @media (max-width: 768px) {
-            .charts-grid { grid-template-columns: 1fr; }
-            .status-grid { grid-template-columns: 1fr; }
-            .control-panel { flex-direction: column; }
-        }
-    </style>
+    <title>PEM Electrolysis Control System - Kenyatta National Hospital</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.css" rel="stylesheet">
+    <link href="main.css" rel="stylesheet">
+    <link href="components.css" rel="stylesheet">
 </head>
 <body>
-    <div class="app-container">
-        <header class="app-header">
-            <h1>🏥 KNH Medical Oxygen Production</h1>
-            <p>Real-time MPC Control System</p>
-            <nav class="main-nav">
-                <button class="nav-btn" onclick="showSection('dashboard')">Dashboard</button>
-                <button class="nav-btn" onclick="showSection('mpc')">MPC Comparison</button>
-                <button class="nav-btn" onclick="showSection('data')">Real Data</button>
-            </nav>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="hospital-brand">
+                <div class="hospital-logo">
+                    <i class="fas fa-hospital"></i>
+                </div>
+                <div class="hospital-info">
+                    <h1>Kenyatta National Hospital</h1>
+                    <p class="subtitle">PEM Electrolysis Control & Monitoring System</p>
+                </div>
+            </div>
+            <div class="header-controls">
+                <div class="connection-status" id="connectionStatus">
+                    <i class="fas fa-circle"></i>
+                    <span>Connecting...</span>
+                </div>
+            </div>
         </header>
 
-        <main class="main-content">
-            <!-- Dashboard Section -->
-            <section id="dashboard-section" class="dashboard-section">
-                <h2>System Status</h2>
-                <div class="status-grid">
-                    <div class="status-card pem-status">
-                        <div class="card-header">
-                            <h3>PEM Electrolyzer</h3>
-                            <span class="status-indicator"></span>
-                        </div>
-                        <div class="card-content">
-                            <div class="metric">
-                                <span>O₂ Production</span>
-                                <span class="metric-value" id="o2-production">43.0 L/min</span>
-                            </div>
-                            <div class="metric">
-                                <span>Efficiency</span>
-                                <span class="metric-value" id="efficiency">72.5%</span>
-                            </div>
-                            <div class="metric">
-                                <span>Temperature</span>
-                                <span class="metric-value" id="temperature">65.9°C</span>
-                            </div>
+        <!-- System Status Banner -->
+        <div class="system-status-banner">
+            <div class="system-info">
+                <h3 class="mb-1">
+                    <i class="fas fa-shield-alt me-2"></i>
+                    System Status: <span id="systemStatus">INITIALIZING</span>
+                </h3>
+                <p class="mb-0">Mode: <strong id="systemMode">STARTUP</strong></p>
+            </div>
+            <div class="status-indicators">
+                <div class="status-item">
+                    <i class="fas fa-microchip"></i>
+                    <span>Controller: Online</span>
+                </div>
+                <div class="status-item">
+                    <i class="fas fa-brain"></i>
+                    <span>MPC: Active</span>
+                </div>
+                <div class="status-item">
+                    <i class="fas fa-database"></i>
+                    <span>Data Logging: Enabled</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <section class="control-panel">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="control-section">
+                        <h3 class="section-title">
+                            <i class="fas fa-cogs"></i>
+                            System Control
+                        </h3>
+                        <div class="btn-group-custom">
+                            <button class="btn-custom btn-success" id="startSystem">
+                                <i class="fas fa-play"></i>
+                                Start System
+                            </button>
+                            <button class="btn-custom btn-warning" id="stopSystem">
+                                <i class="fas fa-stop"></i>
+                                Stop System
+                            </button>
+                            <button class="btn-custom btn-danger" id="emergencyStop">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                Emergency Stop
+                            </button>
                         </div>
                     </div>
 
-                    <div class="status-card mpc-status">
-                        <div class="card-header">
-                            <h3>MPC Controller</h3>
-                            <span class="status-indicator"></span>
-                        </div>
-                        <div class="card-content">
-                            <div class="metric">
-                                <span>Current Algorithm</span>
-                                <span class="metric-value" id="current-algorithm">HE-NMPC</span>
-                            </div>
-                            <div class="metric">
-                                <span>Optimal Current</span>
-                                <span class="metric-value" id="optimal-current">177 A</span>
-                            </div>
-                            <div class="metric">
-                                <span>Power Consumption</span>
-                                <span class="metric-value" id="power">6.8 kW</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="status-card safety-status">
-                        <div class="card-header">
-                            <h3>Safety System</h3>
-                            <span class="status-indicator"></span>
-                        </div>
-                        <div class="card-content">
-                            <div class="metric">
-                                <span>Arduino Status</span>
-                                <span class="metric-value">Connected</span>
-                            </div>
-                            <div class="metric">
-                                <span>Medical Grade</span>
-                                <span class="metric-value" style="color: var(--success);">✅ Certified</span>
-                            </div>
-                            <div class="metric">
-                                <span>Last Update</span>
-                                <span class="metric-value" id="last-update">Just now</span>
-                            </div>
+                    <div class="control-section">
+                        <h3 class="section-title">
+                            <i class="fas fa-sliders-h"></i>
+                            Operation Mode
+                        </h3>
+                        <div class="btn-group-custom">
+                            <button class="btn-custom btn-outline mode-btn active" data-mode="MPC">
+                                <i class="fas fa-brain"></i>
+                                MPC Control
+                            </button>
+                            <button class="btn-custom btn-outline mode-btn" data-mode="AUTO">
+                                <i class="fas fa-robot"></i>
+                                Auto Mode
+                            </button>
+                            <button class="btn-custom btn-outline mode-btn" data-mode="MANUAL">
+                                <i class="fas fa-hand-paper"></i>
+                                Manual Mode
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <h2>Performance Metrics</h2>
-                <div class="charts-grid">
+                <div class="col-md-6">
+                    <div class="control-section">
+                        <h3 class="section-title">
+                            <i class="fas fa-tachometer-alt"></i>
+                            Production Control
+                        </h3>
+                        <div class="slider-container">
+                            <div class="slider-header">
+                                <span>Production Rate</span>
+                                <span class="slider-value" id="productionValue">30%</span>
+                            </div>
+                            <div class="slider-track">
+                                <div class="slider-fill" style="width: 30%;"></div>
+                                <div class="slider-thumb" style="left: 30%;"></div>
+                            </div>
+                            <input type="range" 
+                                   class="form-range" 
+                                   id="productionSlider" 
+                                   min="0" 
+                                   max="100" 
+                                   value="30"
+                                   step="1">
+                        </div>
+                    </div>
+
+                    <div class="control-section">
+                        <h3 class="section-title">
+                            <i class="fas fa-bolt"></i>
+                            Current Settings
+                        </h3>
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="metric-card">
+                                    <div class="metric-title">Setpoint</div>
+                                    <div class="metric-value" id="currentSetpoint">150 A</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="metric-card">
+                                    <div class="metric-title">Applied</div>
+                                    <div class="metric-value" id="currentApplied">150 A</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Real-time Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-title">Cell Temperature</div>
+                    <div class="metric-icon bg-danger">
+                        <i class="fas fa-thermometer-half"></i>
+                    </div>
+                </div>
+                <div class="metric-value" id="temperatureValue">-- °C</div>
+                <div class="metric-trend trend-up">
+                    <i class="fas fa-arrow-up"></i>
+                    <span>Stable</span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-title">Stack Voltage</div>
+                    <div class="metric-icon bg-success">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                </div>
+                <div class="metric-value" id="voltageValue">-- V</div>
+                <div class="metric-trend trend-down">
+                    <i class="fas fa-arrow-down"></i>
+                    <span>Normal</span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-title">Stack Current</div>
+                    <div class="metric-icon bg-info">
+                        <i class="fas fa-current"></i>
+                    </div>
+                </div>
+                <div class="metric-value" id="currentValue">-- A</div>
+                <div class="metric-trend trend-up">
+                    <i class="fas fa-arrow-up"></i>
+                    <span>Optimal</span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-title">O₂ Purity</div>
+                    <div class="metric-icon bg-primary">
+                        <i class="fas fa-wind"></i>
+                    </div>
+                </div>
+                <div class="metric-value" id="purityValue">-- %</div>
+                <div class="metric-trend trend-up">
+                    <i class="fas fa-arrow-up"></i>
+                    <span>Excellent</span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-title">System Efficiency</div>
+                    <div class="metric-icon bg-warning">
+                        <i class="fas fa-percentage"></i>
+                    </div>
+                </div>
+                <div class="metric-value" id="efficiencyValue">-- %</div>
+                <div class="progress">
+                    <div class="progress-bar" style="width: 70%;"></div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div class="metric-title">Battery Level</div>
+                    <div class="metric-icon bg-secondary">
+                        <i class="fas fa-battery-three-quarters"></i>
+                    </div>
+                </div>
+                <div class="metric-value" id="batteryValue">-- %</div>
+                <div class="progress">
+                    <div class="progress-bar" style="width: 85%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="chart-section">
+                    <div class="chart-header">
+                        <h3 class="chart-title">System Overview</h3>
+                        <div class="chart-controls">
+                            <button class="btn-custom btn-outline btn-sm">
+                                <i class="fas fa-sync-alt"></i>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="systemOverviewChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="chart-section">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Energy Distribution</h3>
+                    </div>
                     <div class="chart-container">
                         <canvas id="efficiencyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Production Metrics -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="chart-section">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Gas Production</h3>
                     </div>
                     <div class="chart-container">
                         <canvas id="productionChart"></canvas>
                     </div>
-                    <div class="chart-container">
-                        <canvas id="temperatureChart"></canvas>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="costChart"></canvas>
+                    <div class="row text-center mt-3">
+                        <div class="col-6">
+                            <div class="metric-value" id="o2Production">-- L/h</div>
+                            <div class="metric-title">O₂ Production</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="metric-value" id="h2Production">-- L/h</div>
+                            <div class="metric-title">H₂ Production</div>
+                        </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="control-panel">
-                    <button class="btn btn-primary" onclick="runMPCOptimization()">
-                        🧠 Run MPC Optimization
+            <div class="col-md-6">
+                <div class="chart-section">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Power Consumption</h3>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="powerChart"></canvas>
+                    </div>
+                    <div class="row text-center mt-3">
+                        <div class="col-6">
+                            <div class="metric-value" id="powerValue">-- kW</div>
+                            <div class="metric-title">Current Power</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="metric-value" id="energyCost">-- KES/h</div>
+                            <div class="metric-title">Energy Cost</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MPC Comparison Section -->
+        <section class="mpc-comparison">
+            <div class="chart-header">
+                <h3 class="chart-title">
+                    <i class="fas fa-chess-queen"></i>
+                    MPC Algorithm Comparison
+                </h3>
+                <div class="btn-group-custom">
+                    <button class="btn-custom btn-primary" id="runComparison">
+                        <i class="fas fa-play"></i>
+                        Run Comparison
                     </button>
-                    <button class="btn btn-primary" onclick="loadRealData()">
-                        🔄 Refresh Data
-                    </button>
                 </div>
-            </section>
+            </div>
 
-            <!-- MPC Comparison Section -->
-            <section id="mpc-section" class="dashboard-section" style="display: none;">
-                <h2>MPC Algorithm Comparison</h2>
-                <div class="mpc-comparison">
-                    <h3>🏆 Performance Ranking</h3>
-                    <div id="ranking-container">
-                        <div class="ranking-item ranking-1">
-                            <strong>1. HE-NMPC</strong> - Score: 0.95 (Optimal: 177A)
-                        </div>
-                        <div class="ranking-item ranking-2">
-                            <strong>2. Stochastic-MPC</strong> - Score: 0.88 (Optimal: 172A)  
-                        </div>
-                        <div class="ranking-item ranking-3">
-                            <strong>3. HEMPC</strong> - Score: 0.82 (Optimal: 169A)
-                        </div>
-                        <div class="ranking-item">
-                            <strong>4. MixedInteger-MPC</strong> - Score: 0.78 (Optimal: 165A)
-                        </div>
-                        <div class="ranking-item">
-                            <strong>5. Standard-MPC</strong> - Score: 0.72 (Optimal: 160A)
-                        </div>
-                    </div>
-                </div>
-
-                <div class="charts-grid">
+            <div class="row">
+                <div class="col-lg-6">
                     <div class="chart-container">
-                        <canvas id="mpcEfficiencyChart"></canvas>
+                        <canvas id="mpcComparisonChart"></canvas>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="table-responsive">
+                        <table class="table comparison-table">
+                            <thead>
+                                <tr>
+                                    <th>Algorithm</th>
+                                    <th>Current</th>
+                                    <th>Performance</th>
+                                    <th>Stability</th>
+                                    <th>Speed</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="comparisonTableBody">
+                                <!-- Filled by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-3" id="recommendationsContainer">
+                <!-- Recommendations will be inserted here -->
+            </div>
+        </section>
+
+        <!-- Additional Charts -->
+        <div class="row mt-4">
+            <div class="col-lg-6">
+                <div class="chart-section">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Cost Analysis</h3>
                     </div>
                     <div class="chart-container">
-                        <canvas id="mpcCostChart"></canvas>
+                        <canvas id="costAnalysisChart"></canvas>
                     </div>
                 </div>
-            </section>
-
-            <!-- Real Data Section -->
-            <section id="data-section" class="dashboard-section" style="display: none;">
-                <h2>Real Kenya Data</h2>
-                <div class="data-grid">
-                    <div class="data-card">
-                        <h4>🌤️ Weather Data</h4>
-                        <div id="weather-data">Loading...</div>
+            </div>
+            <div class="col-lg-6">
+                <div class="chart-section">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Historical Trends</h3>
                     </div>
-                    <div class="data-card">
-                        <h4>⚡ Electricity Pricing</h4>
-                        <div id="electricity-data">Loading...</div>
-                    </div>
-                    <div class="data-card">
-                        <h4>🏥 Hospital Demand</h4>
-                        <div id="hospital-data">Loading...</div>
+                    <div class="chart-container">
+                        <canvas id="historicalTrendsChart"></canvas>
                     </div>
                 </div>
-            </section>
-        </main>
+            </div>
+        </div>
     </div>
 
+    <!-- Alerts Container -->
+    <div class="alert-container" id="toastContainer"></div>
+
+    <!-- Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="charts.js"></script>
+    <script src="dashboard.js"></script>
+
     <script>
-        // Simple navigation - NO external file dependencies
-        function showSection(sectionName) {
-            document.getElementById('dashboard-section').style.display = 'none';
-            document.getElementById('mpc-section').style.display = 'none'; 
-            document.getElementById('data-section').style.display = 'none';
-            
-            document.getElementById(sectionName + '-section').style.display = 'block';
-        }
-
-        // Initialize charts when page loads
+        // Initialize the dashboard when the page loads
         document.addEventListener('DOMContentLoaded', function() {
-            initializeCharts();
-            loadRealData();
-            showSection('dashboard');
+            console.log('🏥 KNH PEM System Dashboard Initialized');
         });
-
-        // Simple chart initialization
-        function initializeCharts() {
-            // Efficiency Chart
-            new Chart(document.getElementById('efficiencyChart'), {
-                type: 'line',
-                data: {
-                    labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
-                    datasets: [{
-                        label: 'Efficiency (%)',
-                        data: [65, 68, 70, 72, 72.5, 73, 72.8, 72.5, 72.3, 72.5],
-                        borderColor: '#28a745',
-                        tension: 0.4,
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        title: { display: true, text: 'Efficiency Over Time' }
-                    }
-                }
-            });
-
-            // Production Chart
-            new Chart(document.getElementById('productionChart'), {
-                type: 'bar',
-                data: {
-                    labels: ['HE-NMPC', 'Stochastic', 'HEMPC', 'MixedInt', 'Standard'],
-                    datasets: [{
-                        label: 'O₂ Production (L/min)',
-                        data: [43.0, 41.5, 41.2, 40.5, 39.8],
-                        backgroundColor: ['#2c5aa0', '#17a2b8', '#ffc107', '#6c757d', '#dc3545']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        title: { display: true, text: 'O₂ Production by MPC' }
-                    }
-                }
-            });
-
-            // Temperature Chart
-            new Chart(document.getElementById('temperatureChart'), {
-                type: 'line',
-                data: {
-                    labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
-                    datasets: [{
-                        label: 'Temperature (°C)',
-                        data: [60, 62, 64, 65, 65.5, 65.8, 65.9, 65.7, 65.6, 65.9],
-                        borderColor: '#dc3545',
-                        tension: 0.4,
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        title: { display: true, text: 'Temperature Profile' }
-                    }
-                }
-            });
-
-            // Cost Chart
-            new Chart(document.getElementById('costChart'), {
-                type: 'bar',
-                data: {
-                    labels: ['HE-NMPC', 'Stochastic', 'HEMPC', 'MixedInt', 'Standard'],
-                    datasets: [{
-                        label: 'Cost (KES/m³)',
-                        data: [3.65, 3.82, 3.91, 4.05, 4.20],
-                        backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#6c757d', '#dc3545']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        title: { display: true, text: 'Cost Comparison' }
-                    }
-                }
-            });
-
-            // MPC Comparison Charts
-            new Chart(document.getElementById('mpcEfficiencyChart'), {
-                type: 'radar',
-                data: {
-                    labels: ['Efficiency', 'Cost', 'Response', 'Stability', 'Safety'],
-                    datasets: [
-                        {
-                            label: 'HE-NMPC',
-                            data: [95, 88, 92, 90, 94],
-                            borderColor: '#28a745',
-                            backgroundColor: 'rgba(40, 167, 69, 0.2)'
-                        },
-                        {
-                            label: 'Stochastic-MPC',
-                            data: [88, 85, 78, 82, 80],
-                            borderColor: '#17a2b8', 
-                            backgroundColor: 'rgba(23, 162, 184, 0.2)'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
-
-            new Chart(document.getElementById('mpcCostChart'), {
-                type: 'doughnut',
-                data: {
-                    labels: ['HE-NMPC', 'Stochastic-MPC', 'HEMPC', 'MixedInt-MPC', 'Standard-MPC'],
-                    datasets: [{
-                        data: [35, 25, 20, 12, 8],
-                        backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#6c757d', '#dc3545']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        title: { display: true, text: 'Algorithm Performance Distribution' }
-                    }
-                }
-            });
-        }
-
-        // Data loading functions
-        async function loadRealData() {
-            try {
-                const response = await fetch('/api/system/state');
-                const data = await response.json();
-                
-                document.getElementById('weather-data').innerHTML = `
-                    <strong>Temperature:</strong> ${data.real_data.weather.current.temperature}°C<br>
-                    <strong>Source:</strong> ${data.real_data.weather.source}
-                `;
-                
-                document.getElementById('electricity-data').innerHTML = `
-                    <strong>Price:</strong> ${data.real_data.electricity.current_price} KES/kWh<br>
-                    <strong>Period:</strong> ${data.real_data.electricity.period}
-                `;
-                
-                document.getElementById('hospital-data').innerHTML = `
-                    <strong>Demand:</strong> ${data.real_data.hospital.current_demand.toFixed(1)} m³/h<br>
-                    <strong>Daily Total:</strong> ${data.real_data.hospital.daily_total.toFixed(0)} m³
-                `;
-
-                document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
-                
-            } catch (error) {
-                // Fallback data
-                document.getElementById('weather-data').innerHTML = `
-                    <strong>Temperature:</strong> 17.1°C<br>
-                    <strong>Source:</strong> Nairobi Climate
-                `;
-                document.getElementById('electricity-data').innerHTML = `
-                    <strong>Price:</strong> 21.87 KES/kWh<br>
-                    <strong>Period:</strong> Commercial Rate
-                `;
-                document.getElementById('hospital-data').innerHTML = `
-                    <strong>Demand:</strong> 45.2 m³/h<br>
-                    <strong>Daily Total:</strong> 3825 m³
-                `;
-            }
-        }
-
-        async function runMPCOptimization() {
-            const btn = event.target;
-            btn.innerHTML = '⏳ Optimizing...';
-            btn.disabled = true;
-
-            try {
-                const response = await fetch('/api/mpc/compare');
-                const data = await response.json();
-                
-                // Update with real results
-                if (data.comparison && data.comparison.ranking) {
-                    updateMPCComparison(data.comparison.ranking);
-                }
-                
-                alert('MPC optimization completed! Best: ' + data.comparison.ranking[0].mpcType);
-                
-            } catch (error) {
-                alert('MPC optimization completed with demo data!');
-            } finally {
-                btn.innerHTML = '🧠 Run MPC Optimization';
-                btn.disabled = false;
-            }
-        }
-
-        function updateMPCComparison(ranking) {
-            const container = document.getElementById('ranking-container');
-            container.innerHTML = ranking.map((rank, index) => `
-                <div class="ranking-item ${index < 3 ? 'ranking-' + (index + 1) : ''}">
-                    <strong>${index + 1}. ${rank.mpcType}</strong> - Score: ${rank.score}
-                </div>
-            `).join('');
-        }
     </script>
 </body>
 </html>
