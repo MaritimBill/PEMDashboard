@@ -1,116 +1,160 @@
-// charts.js - ENHANCED WITH NEURAL VISUALIZATION
-class NeuralCharts {
+class ChartManager {
     constructor() {
-        this.optimalCurrentChart = null;
-        this.efficiencyChart = null;
-        this.costChart = null;
-        this.initCharts();
+        this.charts = {};
+        this.dataBuffers = {};
     }
 
-    initCharts() {
-        // Optimal Current Chart
-        this.optimalCurrentChart = new Chart('optimal-current-chart', {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'Neural Optimal Current (A)',
-                    data: [],
-                    borderColor: 'rgb(75, 192, 192)',
-                    tension: 0.1
-                }]
-            }
-        });
+    initializeAllCharts() {
+        this.initializeSystemOverviewChart();
+        this.initializeProductionChart();
+        this.initializeEfficiencyChart();
+        this.initializeCostAnalysisChart();
+        this.initializeMPCPerformanceChart();
+        this.initializeHistoricalTrendsChart();
+    }
 
-        // Efficiency Prediction Chart
-        this.efficiencyChart = new Chart('efficiency-chart', {
+    initializeSystemOverviewChart() {
+        const ctx = document.getElementById('systemOverviewChart')?.getContext('2d');
+        if (!ctx) return;
+
+        this.charts.systemOverview = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: [],
+                labels: this.generateTimeLabels(24),
                 datasets: [
                     {
-                        label: 'Actual Efficiency (%)',
-                        data: [],
-                        borderColor: 'rgb(255, 99, 132)'
+                        label: 'Temperature (°C)',
+                        data: this.generateRandomData(24, 60, 70),
+                        borderColor: '#dc3545',
+                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y'
                     },
                     {
-                        label: 'Neural Prediction (%)',
-                        data: [],
-                        borderColor: 'rgb(54, 162, 235)'
+                        label: 'Current (A)',
+                        data: this.generateRandomData(24, 140, 160),
+                        borderColor: '#0d6efd',
+                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y1'
+                    },
+                    {
+                        label: 'Voltage (V)',
+                        data: this.generateRandomData(24, 37, 39),
+                        borderColor: '#198754',
+                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                        tension: 0.4,
+                        yAxisID: 'y'
                     }
                 ]
+            },
+            options: {
+                responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'hour',
+                            displayFormats: {
+                                hour: 'HH:mm'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Temperature (°C) / Voltage (V)'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Current (A)'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'System Overview - Last 24 Hours'
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                }
             }
         });
+    }
 
-        // Cost Optimization Chart
-        this.costChart = new Chart('cost-chart', {
+    initializeProductionChart() {
+        const ctx = document.getElementById('productionChart')?.getContext('2d');
+        if (!ctx) return;
+
+        this.charts.production = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: ['Current', 'Neural Optimal'],
-                datasets: [{
-                    label: 'Cost (KES/m³ O₂)',
-                    data: [0, 0],
-                    backgroundColor: ['rgba(255, 99, 132, 0.5)', 'rgba(75, 192, 192, 0.5)']
-                }]
+                labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+                datasets: [
+                    {
+                        label: 'O₂ Production (L/h)',
+                        data: [120, 180, 220, 210, 190, 160],
+                        backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                        borderColor: 'rgb(54, 162, 235)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'H₂ Production (L/h)',
+                        data: [240, 360, 440, 420, 380, 320],
+                        backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                        borderColor: 'rgb(255, 99, 132)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Production Rate (L/h)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time of Day'
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Gas Production Rates'
+                    }
+                }
             }
         });
     }
 
-    updateNeuralOptimization(neuralData) {
-        // Update optimal current chart
-        this.updateChart(this.optimalCurrentChart, neuralData.optimal_current);
-        
-        // Update efficiency comparison
-        this.updateEfficiencyComparison(neuralData.expected_efficiency);
-        
-        // Update cost comparison
-        this.updateCostComparison(neuralData.cost_per_m3);
-        
-        console.log('📈 Charts updated with neural optimization');
-    }
-
-    updateEfficiencyComparison(predictedEfficiency) {
-        // Add current actual efficiency from PEM data
-        const currentEfficiency = this.getCurrentEfficiency(); // From PEM telemetry
-        
-        this.efficiencyChart.data.labels.push(new Date().toLocaleTimeString());
-        this.efficiencyChart.data.datasets[0].data.push(currentEfficiency);
-        this.efficiencyChart.data.datasets[1].data.push(predictedEfficiency);
-        
-        // Keep last 20 points
-        if (this.efficiencyChart.data.labels.length > 20) {
-            this.efficiencyChart.data.labels.shift();
-            this.efficiencyChart.data.datasets[0].data.shift();
-            this.efficiencyChart.data.datasets[1].data.shift();
-        }
-        
-        this.efficiencyChart.update();
-    }
-
-    updateCostComparison(optimalCost) {
-        const currentCost = this.calculateCurrentCost(); // From current operation
-        
-        this.costChart.data.datasets[0].data = [currentCost, optimalCost];
-        this.costChart.update();
-        
-        // Show savings
-        const savings = ((currentCost - optimalCost) / currentCost * 100).toFixed(1);
-        document.getElementById('cost-savings').textContent = savings + '%';
-    }
-
-    calculateCurrentCost() {
-        // Calculate current operational cost
-        // This would use real-time data from PEM system
-        return 4.2; // Example current cost
-    }
-
-    getCurrentEfficiency() {
-        // Get current efficiency from PEM telemetry
-        return 72.5; // Example current efficiency
-    }
-}
-
-// Initialize when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    window.neuralCharts = new NeuralCharts();
-});
+    initializeEfficiencyChart() {
+        const ctx = document.getElementById('efficiencyChart')?.getContext
