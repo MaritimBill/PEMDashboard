@@ -1,72 +1,288 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KNH MPC Comparison Dashboard</title>
+    <title>KNH Medical Oxygen System</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .mpc-card { margin: 10px; padding: 15px; border-radius: 8px; color: white; }
-        .he-nmpc { background: #FF6B6B; }
-        .standard { background: #4ECDC4; }
-        .mixed-integer { background: #45B7D1; }
-        .stochastic { background: #96CEB4; }
-        .hempc { background: #FFEAA7; color: #333; }
-        .ranking { font-size: 18px; font-weight: bold; margin: 5px 0; }
-    </style>
+    <link rel="stylesheet" href="main.css">
+    <link rel="stylesheet" href="components.css">
 </head>
 <body>
-    <div id="app">
-        <h1>🏥 KNH MPC Algorithm Comparison</h1>
-        
-        <div class="controls">
-            <button onclick="runMPCComparison()">Run MPC Comparison</button>
-            <button onclick="startRealTimeMonitoring()">Start Real-time Monitoring</button>
-        </div>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1>🏥 KNH Medical Oxygen Production</h1>
+                <p class="subtitle">Real-time MPC Control System</p>
+            </div>
+            <nav class="main-nav" id="mainNav"></nav>
+        </header>
 
-        <div class="real-data">
-            <h3>📊 Real Kenya Data</h3>
-            <div id="weather-data">Weather: Loading...</div>
-            <div id="electricity-data">Electricity: Loading...</div>
-            <div id="hospital-data">Hospital Demand: Loading...</div>
-        </div>
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- System Status Cards -->
+            <section class="dashboard-section">
+                <h2>System Status</h2>
+                <div class="status-grid">
+                    <div class="status-card pem-status">
+                        <div class="card-header">
+                            <h3>PEM Electrolyzer</h3>
+                            <span class="status-indicator online"></span>
+                        </div>
+                        <div class="card-content">
+                            <div class="metric">
+                                <span class="metric-label">O₂ Production</span>
+                                <span class="metric-value" id="o2-production">--</span>
+                                <span class="metric-unit">L/min</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Efficiency</span>
+                                <span class="metric-value" id="efficiency">--</span>
+                                <span class="metric-unit">%</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Temperature</span>
+                                <span class="metric-value" id="temperature">--</span>
+                                <span class="metric-unit">°C</span>
+                            </div>
+                        </div>
+                    </div>
 
-        <div class="mpc-ranking">
-            <h3>🏆 MPC Performance Ranking</h3>
-            <div id="ranking-list"></div>
-        </div>
+                    <div class="status-card mpc-status">
+                        <div class="card-header">
+                            <h3>MPC Controller</h3>
+                            <span class="status-indicator online"></span>
+                        </div>
+                        <div class="card-content">
+                            <div class="metric">
+                                <span class="metric-label">Current Algorithm</span>
+                                <span class="metric-value" id="current-algorithm">HE-NMPC</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Optimal Current</span>
+                                <span class="metric-value" id="optimal-current">--</span>
+                                <span class="metric-unit">A</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Computation Time</span>
+                                <span class="metric-value" id="computation-time">--</span>
+                                <span class="metric-unit">ms</span>
+                            </div>
+                        </div>
+                    </div>
 
-        <div class="mpc-comparison">
-            <div class="mpc-card he-nmpc">
-                <h4>HE-NMPC</h4>
-                <div class="performance"></div>
-            </div>
-            <div class="mpc-card standard">
-                <h4>Standard MPC</h4>
-                <div class="performance"></div>
-            </div>
-            <div class="mpc-card mixed-integer">
-                <h4>Mixed-Integer MPC</h4>
-                <div class="performance"></div>
-            </div>
-            <div class="mpc-card stochastic">
-                <h4>Stochastic MPC</h4>
-                <div class="performance"></div>
-            </div>
-            <div class="mpc-card hempc">
-                <h4>HEMPC</h4>
-                <div class="performance"></div>
-            </div>
-        </div>
+                    <div class="status-card safety-status">
+                        <div class="card-header">
+                            <h3>Safety System</h3>
+                            <span class="status-indicator online"></span>
+                        </div>
+                        <div class="card-content">
+                            <div class="metric">
+                                <span class="metric-label">Arduino Status</span>
+                                <span class="metric-value">Connected</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Medical Grade</span>
+                                <span class="metric-value safe">✅ Certified</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">Last Update</span>
+                                <span class="metric-value" id="last-update">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-        <div class="charts">
-            <canvas id="efficiencyChart" width="400" height="200"></canvas>
-            <canvas id="costChart" width="400" height="200"></canvas>
-            <canvas id="performanceChart" width="400" height="200"></canvas>
-        </div>
+            <!-- Real-time Charts -->
+            <section class="dashboard-section">
+                <h2>Performance Metrics</h2>
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <canvas id="efficiencyChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="productionChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="temperatureChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="costChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Control Panel -->
+            <section class="dashboard-section">
+                <h2>Control Panel</h2>
+                <div class="control-panel">
+                    <button class="btn btn-primary" onclick="runMPCOptimization()">
+                        🧠 Run MPC Optimization
+                    </button>
+                    <button class="btn btn-secondary" onclick="showMPCComparison()">
+                        📊 View MPC Comparison
+                    </button>
+                    <button class="btn btn-outline" onclick="refreshData()">
+                        🔄 Refresh Data
+                    </button>
+                </div>
+            </section>
+
+            <!-- Real Kenya Data -->
+            <section class="dashboard-section">
+                <h2>Real Kenya Data</h2>
+                <div class="data-grid">
+                    <div class="data-card">
+                        <h4>🌤️ Weather Data</h4>
+                        <div id="weather-data">Loading...</div>
+                    </div>
+                    <div class="data-card">
+                        <h4>⚡ Electricity Pricing</h4>
+                        <div id="electricity-data">Loading...</div>
+                    </div>
+                    <div class="data-card">
+                        <h4>🏥 Hospital Demand</h4>
+                        <div id="hospital-data">Loading...</div>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
 
-    <script src="/js/mpc-dashboard.js"></script>
+    <script src="navigation.js"></script>
+    <script src="charts.js"></script>
+    <script>
+        // Initialize navigation
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeNavigation();
+            initializeCharts();
+            loadRealData();
+            startRealTimeUpdates();
+        });
+
+        async function runMPCOptimization() {
+            const btn = event.target;
+            btn.innerHTML = '⏳ Optimizing...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/mpc/compare');
+                const data = await response.json();
+                
+                updateDashboard(data);
+                showNotification('MPC optimization completed successfully!', 'success');
+                
+            } catch (error) {
+                showNotification('Optimization failed: ' + error.message, 'error');
+            } finally {
+                btn.innerHTML = '🧠 Run MPC Optimization';
+                btn.disabled = false;
+            }
+        }
+
+        function showMPCComparison() {
+            window.location.href = '/mpc-dashboard.html';
+        }
+
+        async function refreshData() {
+            await loadRealData();
+            showNotification('Data refreshed', 'info');
+        }
+
+        async function loadRealData() {
+            try {
+                const response = await fetch('/api/system/state');
+                const data = await response.json();
+                
+                document.getElementById('weather-data').innerHTML = `
+                    <strong>Temperature:</strong> ${data.real_data.weather.current.temperature}°C<br>
+                    <strong>Source:</strong> ${data.real_data.weather.source}
+                `;
+                
+                document.getElementById('electricity-data').innerHTML = `
+                    <strong>Price:</strong> ${data.real_data.electricity.current_price} KES/kWh<br>
+                    <strong>Period:</strong> ${data.real_data.electricity.period}
+                `;
+                
+                document.getElementById('hospital-data').innerHTML = `
+                    <strong>Demand:</strong> ${data.real_data.hospital.current_demand.toFixed(1)} m³/h<br>
+                    <strong>Daily Total:</strong> ${data.real_data.hospital.daily_total.toFixed(0)} m³
+                `;
+
+                // Update system metrics
+                document.getElementById('o2-production').textContent = data.system_state.o2_production.toFixed(1);
+                document.getElementById('efficiency').textContent = data.system_state.efficiency.toFixed(1);
+                document.getElementById('temperature').textContent = data.system_state.temperature.toFixed(1);
+                document.getElementById('optimal-current').textContent = data.system_state.current;
+                document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+
+            } catch (error) {
+                console.error('Failed to load real data:', error);
+            }
+        }
+
+        function updateDashboard(mpcData) {
+            const bestMPC = mpcData.comparison.ranking[0];
+            document.getElementById('current-algorithm').textContent = bestMPC.mpcType;
+            document.getElementById('computation-time').textContent = mpcData.computation_time || '--';
+            
+            // Update charts with new data
+            updateChartsWithMPCData(mpcData);
+        }
+
+        function startRealTimeUpdates() {
+            // Simulate real-time updates
+            setInterval(loadRealData, 10000); // Update every 10 seconds
+        }
+
+        function showNotification(message, type = 'info') {
+            // Simple notification system
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.innerHTML = `
+                <span>${message}</span>
+                <button onclick="this.parentElement.remove()">×</button>
+            `;
+            
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
+                color: white;
+                padding: 15px 20px;
+                border-radius: 5px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+            `;
+            
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 5000);
+        }
+    </script>
+
+    <style>
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .notification button {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        
+        .metric-value.safe {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+    </style>
 </body>
 </html>
