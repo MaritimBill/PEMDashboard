@@ -1,584 +1,343 @@
-class ChartManager {
+const Chart = require('chart.js');
+
+// Custom real-time chart plugin
+const realTimePlugin = {
+    id: 'realtime',
+    beforeInit: function(chart) {
+        chart.realtime = {
+            data: [],
+            duration: 60000,
+            refresh: 1000,
+            delay: 2000,
+            onRefresh: null
+        };
+    },
+    afterUpdate: function(chart) {
+        if (chart.config.options.scales.x.type === 'realtime') {
+            const realtime = chart.realtime;
+            const now = Date.now();
+            
+            // Remove old data
+            const cutoff = now - realtime.duration;
+            let firstIndex = 0;
+            
+            while (firstIndex < chart.data.labels.length) {
+                const labelTime = new Date(chart.data.labels[firstIndex]).getTime();
+                if (labelTime > cutoff) break;
+                firstIndex++;
+            }
+            
+            if (firstIndex > 0) {
+                chart.data.labels.splice(0, firstIndex);
+                chart.data.datasets.forEach(dataset => {
+                    dataset.data.splice(0, firstIndex);
+                });
+            }
+        }
+    }
+};
+
+Chart.register(realTimePlugin);
+
+class PEMCharts {
     constructor() {
         this.charts = {};
-        this.dataBuffers = {};
+        this.colors = {
+            primary: 'rgb(75, 192, 192)',
+            secondary: 'rgb(255, 99, 132)',
+            tertiary: 'rgb(54, 162, 235)',
+            success: 'rgb(75, 192, 120)',
+            warning: 'rgb(255, 159, 64)',
+            danger: 'rgb(255, 99, 100)'
+        };
     }
 
-    initializeAllCharts() {
-        this.initializeSystemOverviewChart();
-        this.initializeProductionChart();
-        this.initializeEfficiencyChart();
-        this.initializeCostAnalysisChart();
-        this.initializeMPCPerformanceChart();
-        this.initializeHistoricalTrendsChart();
-    }
-
-    initializeSystemOverviewChart() {
-        const ctx = document.getElementById('systemOverviewChart')?.getContext('2d');
-        if (!ctx) return;
-
-        this.charts.systemOverview = new Chart(ctx, {
+    createRealTimeChart(canvasId, config) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        
+        const defaultConfig = {
             type: 'line',
             data: {
-                labels: this.generateTimeLabels(24),
-                datasets: [
-                    {
-                        label: 'Temperature (°C)',
-                        data: this.generateRandomData(24, 60, 70),
-                        borderColor: '#dc3545',
-                        backgroundColor: 'rgba(220, 53, 69, 0.1)',
-                        tension: 0.4,
-                        yAxisID: 'y'
-                    },
-                    {
-                        label: 'Current (A)',
-                        data: this.generateRandomData(24, 140, 160),
-                        borderColor: '#0d6efd',
-                        backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                        tension: 0.4,
-                        yAxisID: 'y1'
-                    },
-                    {
-                        label: 'Voltage (V)',
-                        data: this.generateRandomData(24, 37, 39),
-                        borderColor: '#198754',
-                        backgroundColor: 'rgba(25, 135, 84, 0.1)',
-                        tension: 0.4,
-                        yAxisID: 'y'
-                    }
-                ]
+                labels: [],
+                datasets: []
             },
             options: {
                 responsive: true,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 0
                 },
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: {
-                            unit: 'hour',
-                            displayFormats: {
-                                hour: 'HH:mm'
-                            }
-                        },
-                        title: {
-                            display: true,
-                            text: 'Time'
-                        }
-                    },
-                    y: {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
-                        title: {
-                            display: true,
-                            text: 'Temperature (°C) / Voltage (V)'
-                        }
-                    },
-                    y1: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: {
-                            display: true,
-                            text: 'Current (A)'
-                        },
-                        grid: {
-                            drawOnChartArea: false
-                        }
-                    }
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
                 },
                 plugins: {
-                    title: {
+                    legend: {
                         display: true,
-                        text: 'System Overview - Last 24 Hours'
+                        position: 'top'
                     },
                     tooltip: {
                         mode: 'index',
                         intersect: false
                     }
-                }
-            }
-        });
-    }
-
-    initializeProductionChart() {
-        const ctx = document.getElementById('productionChart')?.getContext('2d');
-        if (!ctx) return;
-
-        this.charts.production = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
-                datasets: [
-                    {
-                        label: 'O₂ Production (L/h)',
-                        data: [120, 180, 220, 210, 190, 160],
-                        backgroundColor: 'rgba(54, 162, 235, 0.8)',
-                        borderColor: 'rgb(54, 162, 235)',
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'H₂ Production (L/h)',
-                        data: [240, 360, 440, 420, 380, 320],
-                        backgroundColor: 'rgba(255, 99, 132, 0.8)',
-                        borderColor: 'rgb(255, 99, 132)',
-                        borderWidth: 1
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Production Rate (L/h)'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Time of Day'
-                        }
-                    }
                 },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Gas Production Rates'
+                scales: {
+                    x: {
+                        type: 'realtime',
+                        realtime: {
+                            duration: 60000,
+                            refresh: 1000,
+                            delay: 2000,
+                            onRefresh: this.onRefresh
+                        }
+                    },
+                    y: {
+                        beginAtZero: true
                     }
                 }
             }
-        });
+        };
+
+        const mergedConfig = this.deepMerge(defaultConfig, config);
+        this.charts[canvasId] = new Chart(ctx, mergedConfig);
+        
+        return this.charts[canvasId];
     }
 
-    initializeEfficiencyChart() {
-        const ctx = document.getElementById('efficiencyChart')?.getContext('2d');
-        if (!ctx) return;
+    createGaugeChart(canvasId, value, maxValue, label) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        
+        const data = {
+            datasets: [{
+                data: [value, maxValue - value],
+                backgroundColor: [
+                    this.getColorForValue(value / maxValue),
+                    'rgba(200, 200, 200, 0.2)'
+                ],
+                borderWidth: 0
+            }]
+        };
 
-        this.charts.efficiency = new Chart(ctx, {
+        const config = {
             type: 'doughnut',
-            data: {
-                labels: ['Useful Energy', 'Stack Losses', 'Cooling System', 'Control System'],
-                datasets: [{
-                    data: [65, 20, 10, 5],
-                    backgroundColor: [
-                        'rgb(75, 192, 192)',
-                        'rgb(255, 99, 132)',
-                        'rgb(255, 205, 86)',
-                        'rgb(54, 162, 235)'
-                    ],
-                    borderWidth: 2,
-                    borderColor: '#fff'
-                }]
-            },
+            data: data,
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
+                cutout: '75%',
+                circumference: 180,
+                rotation: 270,
                 plugins: {
                     legend: {
-                        position: 'bottom'
-                    },
-                    title: {
-                        display: true,
-                        text: 'Energy Distribution'
+                        display: false
                     },
                     tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return `${context.label}: ${context.raw}%`;
-                            }
-                        }
+                        enabled: false
                     }
                 }
-            }
-        });
-    }
-
-    initializeCostAnalysisChart() {
-        const ctx = document.getElementById('costAnalysisChart')?.getContext('2d');
-        if (!ctx) return;
-
-        this.charts.costAnalysis = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: this.generateTimeLabels(7),
-                datasets: [
-                    {
-                        label: 'Electricity Cost (KES)',
-                        data: this.generateRandomData(7, 400, 600),
-                        borderColor: '#ff6384',
-                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                        yAxisID: 'y',
-                        tension: 0.4
-                    },
-                    {
-                        label: 'O₂ Production (L)',
-                        data: this.generateRandomData(7, 2000, 3000),
-                        borderColor: '#36a2eb',
-                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
-                        yAxisID: 'y1',
-                        tension: 0.4
-                    },
-                    {
-                        label: 'KPLC Tariff (KES/kWh)',
-                        data: [18.69, 25.33, 18.69, 18.69, 25.33, 12.50, 12.50],
-                        borderColor: '#4bc0c0',
-                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
-                        yAxisID: 'y2',
-                        tension: 0.4,
-                        borderDash: [5, 5]
-                    }
-                ]
             },
-            options: {
-                responsive: true,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: {
-                            unit: 'day'
-                        }
-                    },
-                    y: {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
-                        title: {
-                            display: true,
-                            text: 'Cost (KES)'
-                        }
-                    },
-                    y1: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: {
-                            display: true,
-                            text: 'Production (L)'
-                        },
-                        grid: {
-                            drawOnChartArea: false
-                        }
-                    },
-                    y2: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: {
-                            display: true,
-                            text: 'Tariff (KES/kWh)'
-                        },
-                        grid: {
-                            drawOnChartArea: false
-                        },
-                        offset: true
-                    }
-                },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Cost Analysis & KPLC Tariff Impact'
-                    }
+            plugins: [{
+                id: 'gaugeLabel',
+                afterDraw: (chart) => {
+                    const { ctx, chartArea: { width, height } } = chart;
+                    ctx.save();
+                    ctx.font = 'bold 16px Arial';
+                    ctx.fillStyle = '#333';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(label, width / 2, height / 2 + 10);
+                    ctx.font = 'bold 24px Arial';
+                    ctx.fillText(value.toFixed(1), width / 2, height / 2 - 10);
+                    ctx.restore();
                 }
-            }
-        });
+            }]
+        };
+
+        this.charts[canvasId] = new Chart(ctx, config);
+        return this.charts[canvasId];
     }
 
-    initializeMPCPerformanceChart() {
-        const ctx = document.getElementById('mpcPerformanceChart')?.getContext('2d');
-        if (!ctx) return;
-
-        this.charts.mpcPerformance = new Chart(ctx, {
+    createRadarChart(canvasId, labels, datasets) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        
+        const config = {
             type: 'radar',
             data: {
-                labels: [
-                    'Control Accuracy', 
-                    'Response Time', 
-                    'Energy Efficiency',
-                    'Stability',
-                    'Cost Optimization',
-                    'Adaptability'
-                ],
-                datasets: [
-                    {
-                        label: 'HENMPC',
-                        data: [95, 85, 90, 92, 88, 94],
-                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                        borderColor: 'rgb(255, 99, 132)',
-                        pointBackgroundColor: 'rgb(255, 99, 132)'
-                    },
-                    {
-                        label: 'Standard MPC',
-                        data: [75, 90, 70, 80, 65, 70],
-                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
-                        borderColor: 'rgb(54, 162, 235)',
-                        pointBackgroundColor: 'rgb(54, 162, 235)'
-                    },
-                    {
-                        label: 'Mixed Integer MPC',
-                        data: [82, 65, 75, 78, 80, 75],
-                        backgroundColor: 'rgba(255, 205, 86, 0.2)',
-                        borderColor: 'rgb(255, 205, 86)',
-                        pointBackgroundColor: 'rgb(255, 205, 86)'
-                    }
-                ]
+                labels: labels,
+                datasets: datasets.map((dataset, index) => ({
+                    label: dataset.label,
+                    data: dataset.data,
+                    fill: true,
+                    backgroundColor: this.withAlpha(this.colors.primary, 0.2),
+                    borderColor: this.colors.primary,
+                    pointBackgroundColor: this.colors.primary,
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: this.colors.primary
+                }))
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
+                elements: {
+                    line: {
+                        borderWidth: 3
+                    }
+                },
                 scales: {
                     r: {
                         angleLines: {
                             display: true
                         },
                         suggestedMin: 0,
-                        suggestedMax: 100,
-                        ticks: {
-                            stepSize: 20
-                        }
-                    }
-                },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'MPC Algorithm Performance Comparison'
-                    },
-                    legend: {
-                        position: 'bottom'
+                        suggestedMax: 100
                     }
                 }
             }
-        });
+        };
+
+        this.charts[canvasId] = new Chart(ctx, config);
+        return this.charts[canvasId];
     }
 
-    initializeHistoricalTrendsChart() {
-        const ctx = document.getElementById('historicalTrendsChart')?.getContext('2d');
-        if (!ctx) return;
+    createComparisonChart(canvasId, comparisonData) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        
+        const mpcTypes = Object.keys(comparisonData);
+        const metrics = ['Performance', 'Cost Efficiency', 'Computation Time', 'Reliability'];
+        
+        const datasets = metrics.map((metric, metricIndex) => ({
+            label: metric,
+            data: mpcTypes.map(type => comparisonData[type].scores[metricIndex]),
+            backgroundColor: this.getColorByIndex(metricIndex)
+        }));
 
-        this.charts.historicalTrends = new Chart(ctx, {
-            type: 'line',
+        const config = {
+            type: 'bar',
             data: {
-                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
-                datasets: [
-                    {
-                        label: 'Total O₂ Production (m³)',
-                        data: [12500, 13200, 14100, 15800, 14900, 16300, 17500],
-                        borderColor: '#36a2eb',
-                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
-                        yAxisID: 'y',
-                        fill: true
-                    },
-                    {
-                        label: 'Energy Cost (KES ×1000)',
-                        data: [85, 88, 92, 105, 98, 110, 115],
-                        borderColor: '#ff6384',
-                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                        yAxisID: 'y1',
-                        fill: true
-                    },
-                    {
-                        label: 'System Efficiency (%)',
-                        data: [68, 69, 71, 72, 70, 73, 74],
-                        borderColor: '#4bc0c0',
-                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
-                        yAxisID: 'y2',
-                        fill: true
-                    }
-                ]
+                labels: mpcTypes,
+                datasets: datasets
             },
             options: {
                 responsive: true,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
+                maintainAspectRatio: false,
                 scales: {
                     x: {
-                        title: {
-                            display: true,
-                            text: 'Month'
-                        }
+                        stacked: false
                     },
                     y: {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
-                        title: {
-                            display: true,
-                            text: 'O₂ Production (m³)'
-                        }
-                    },
-                    y1: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: {
-                            display: true,
-                            text: 'Energy Cost (KES ×1000)'
-                        },
-                        grid: {
-                            drawOnChartArea: false
-                        }
-                    },
-                    y2: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: {
-                            display: true,
-                            text: 'Efficiency (%)'
-                        },
-                        grid: {
-                            drawOnChartArea: false
-                        },
-                        offset: true
-                    }
-                },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Historical Performance Trends - Kenyatta National Hospital'
+                        stacked: false,
+                        beginAtZero: true,
+                        max: 100
                     }
                 }
             }
-        });
+        };
+
+        this.charts[canvasId] = new Chart(ctx, config);
+        return this.charts[canvasId];
     }
 
-    // Utility methods
-    generateTimeLabels(count) {
-        const labels = [];
-        const now = new Date();
-        
-        for (let i = count - 1; i >= 0; i--) {
-            const time = new Date(now);
-            time.setHours(time.getHours() - i);
-            labels.push(time);
-        }
-        
-        return labels;
-    }
-
-    generateRandomData(count, min, max) {
-        const data = [];
-        for (let i = 0; i < count; i++) {
-            data.push(min + Math.random() * (max - min));
-        }
-        return data;
-    }
-
-    updateRealTimeData(sensorData) {
-        // Update all charts with new real-time data
-        this.updateSystemOverview(sensorData);
-        this.updateEfficiency(sensorData);
-    }
-
-    updateSystemOverview(data) {
-        const chart = this.charts.systemOverview;
+    updateChartData(canvasId, newData) {
+        const chart = this.charts[canvasId];
         if (!chart) return;
 
-        const now = new Date();
-        
-        // Add new data point
-        chart.data.labels.push(now);
-        chart.data.datasets[0].data.push(data.temperature);
-        chart.data.datasets[1].data.push(data.current);
-        chart.data.datasets[2].data.push(data.voltage);
+        chart.data = newData;
+        chart.update();
+    }
 
-        // Keep only last 50 points
-        if (chart.data.labels.length > 50) {
+    addDataPoint(canvasId, label, dataPoints) {
+        const chart = this.charts[canvasId];
+        if (!chart) return;
+
+        chart.data.labels.push(label);
+        
+        dataPoints.forEach((dataPoint, index) => {
+            if (chart.data.datasets[index]) {
+                chart.data.datasets[index].data.push(dataPoint);
+            }
+        });
+
+        // Remove old data if needed
+        if (chart.data.labels.length > 100) {
             chart.data.labels.shift();
-            chart.data.datasets.forEach(dataset => dataset.data.shift());
+            chart.data.datasets.forEach(dataset => {
+                dataset.data.shift();
+            });
         }
 
         chart.update('none');
     }
 
-    updateEfficiency(data) {
-        const chart = this.charts.efficiency;
+    updateGaugeValue(canvasId, newValue) {
+        const chart = this.charts[canvasId];
         if (!chart) return;
 
-        // Update efficiency distribution based on current data
-        const usefulEnergy = data.systemEfficiency || 65;
-        const stackLosses = 20;
-        const cooling = 10;
-        const control = 5;
-
-        chart.data.datasets[0].data = [usefulEnergy, stackLosses, cooling, control];
+        chart.data.datasets[0].data = [newValue, chart.data.datasets[0].data[1] + chart.data.datasets[0].data[0] - newValue];
         chart.update();
     }
 
-    updateMPCComparison(comparisonData) {
-        const chart = this.charts.mpcPerformance;
-        if (!chart || !comparisonData?.algorithms) return;
-
-        const datasets = [];
-        const colors = {
-            HENMPC: { border: 'rgb(255, 99, 132)', background: 'rgba(255, 99, 132, 0.2)' },
-            STANDARD_MPC: { border: 'rgb(54, 162, 235)', background: 'rgba(54, 162, 235, 0.2)' },
-            MIXED_INTEGER_MPC: { border: 'rgb(255, 205, 86)', background: 'rgba(255, 205, 86, 0.2)' },
-            STOCHASTIC_MPC: { border: 'rgb(75, 192, 192)', background: 'rgba(75, 192, 192, 0.2)' },
-            HEMPC: { border: 'rgb(153, 102, 255)', background: 'rgba(153, 102, 255, 0.2)' }
-        };
-
-        Object.entries(comparisonData.algorithms).forEach(([name, algo]) => {
-            if (algo.error) return;
-
-            const color = colors[name] || { border: 'rgb(128, 128, 128)', background: 'rgba(128, 128, 128, 0.2)' };
-            
-            datasets.push({
-                label: name,
-                data: [
-                    algo.performance || 70,
-                    100 - Math.min((algo.computationTime || 50) / 100, 1) * 100, // Convert to performance metric
-                    algo.predictedEfficiency || 70,
-                    algo.stability || 70,
-                    algo.costSaving || 70,
-                    80 + Math.random() * 15 // Adaptability score
-                ],
-                backgroundColor: color.background,
-                borderColor: color.border,
-                pointBackgroundColor: color.border
-            });
-        });
-
-        chart.data.datasets = datasets;
-        chart.update();
+    getColorForValue(value) {
+        if (value < 0.3) return this.colors.success;
+        if (value < 0.7) return this.colors.warning;
+        return this.colors.danger;
     }
 
-    // Export chart data
-    exportChartData(chartName) {
-        const chart = this.charts[chartName];
-        if (!chart) return null;
-
-        return {
-            labels: chart.data.labels,
-            datasets: chart.data.datasets.map(dataset => ({
-                label: dataset.label,
-                data: dataset.data
-            }))
-        };
+    getColorByIndex(index) {
+        const colors = [
+            this.colors.primary,
+            this.colors.secondary,
+            this.colors.tertiary,
+            this.colors.success,
+            this.colors.warning
+        ];
+        return colors[index % colors.length];
     }
 
-    // Reset specific chart
-    resetChart(chartName) {
-        const chart = this.charts[chartName];
-        if (chart) {
-            chart.data.labels = [];
-            chart.data.datasets.forEach(dataset => dataset.data = []);
-            chart.update();
+    withAlpha(color, alpha) {
+        if (color.startsWith('rgb')) {
+            const rgb = color.match(/\d+/g);
+            return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
         }
+        return color;
+    }
+
+    deepMerge(target, source) {
+        const output = Object.assign({}, target);
+        
+        if (this.isObject(target) && this.isObject(source)) {
+            Object.keys(source).forEach(key => {
+                if (this.isObject(source[key])) {
+                    if (!(key in target)) {
+                        Object.assign(output, { [key]: source[key] });
+                    } else {
+                        output[key] = this.deepMerge(target[key], source[key]);
+                    }
+                } else {
+                    Object.assign(output, { [key]: source[key] });
+                }
+            });
+        }
+        
+        return output;
+    }
+
+    isObject(item) {
+        return item && typeof item === 'object' && !Array.isArray(item);
+    }
+
+    destroyChart(canvasId) {
+        if (this.charts[canvasId]) {
+            this.charts[canvasId].destroy();
+            delete this.charts[canvasId];
+        }
+    }
+
+    destroyAllCharts() {
+        Object.keys(this.charts).forEach(canvasId => {
+            this.destroyChart(canvasId);
+        });
     }
 }
 
-// Initialize chart manager
-document.addEventListener('DOMContentLoaded', () => {
-    window.chartManager = new ChartManager();
-    window.chartManager.initializeAllCharts();
-});
+module.exports = PEMCharts;
