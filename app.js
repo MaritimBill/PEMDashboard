@@ -1,184 +1,154 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
+const mqtt = require('mqtt');
 const path = require('path');
-const mqtt = require('./mqtt');
-const MPCComparator = require('./mpc-comparator');
-const NeuralMPC = require('./neural-mpc');
+const cors = require('cors');
 
-class PEMDashboard {
-    constructor() {
-        this.app = express();
-        this.server = http.createServer(this.app);
-        this.io = socketIo(this.server);
-        this.port = process.env.PORT || 3000;
-        
-        // Initialize components
-        this.mqttClient = new mqtt.MQTTClient(this.io);
-        this.mpcComparator = new MPCComparator();
-        this.neuralMPC = new NeuralMPC();
-        
-        this.setupExpress();
-        this.setupSocketIO();
-        this.startDataSimulation();
-    }
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 
-    setupExpress() {
-        this.app.use(express.static(path.join(__dirname, 'public')));
-        this.app.use(express.json());
-        
-        this.app.get('/', (req, res) => {
-            res.sendFile(path.join(__dirname, 'views', 'index.html'));
-        });
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
-        this.app.get('/mpc-comparison', (req, res) => {
-            res.sendFile(path.join(__dirname, 'views', 'mpc-comparator.html'));
-        });
+// MQTT Configuration
+const MQTT_BROKER = 'mqtt://localhost:1883';
+const MQTT_TOPICS = {
+  MATLAB_DATA: 'pem/matlab/data',
+  MATLAB_CONTROL: 'pem/matlab/control',
+  ARDUINO_DATA: 'pem/arduino/data',
+  ARDUINO_CONTROL: 'pem/arduino/control',
+  MPC_COMPARISON: 'pem/mpc/comparison'
+};
 
-        this.app.get('/neural-mpc', (req, res) => {
-            res.sendFile(path.join(__dirname, 'views', 'neural-mpc.html'));
-        });
+// MQTT Client
+let mqttClient = null;
 
-        // API endpoints
-        this.app.post('/api/mpc/control', (req, res) => {
-            this.handleMPCControl(req.body, res);
-        });
+// Initialize MQTT connection
+function initializeMQTT() {
+  mqttClient = mqtt.connect(MQTT_BROKER);
 
-        this.app.get('/api/system/status', (req, res) => {
-            res.json(this.getSystemStatus());
-        });
-
-        this.app.post('/api/neural/train', async (req, res) => {
-            try {
-                await this.neuralMPC.trainModel();
-                res.json({ success: true, message: 'Neural MPC model trained successfully' });
-            } catch (error) {
-                res.status(500).json({ success: false, error: error.message });
-            }
-        });
-    }
-
-    setupSocketIO() {
-        this.io.on('connection', (socket) => {
-            console.log('Client connected:', socket.id);
-
-            socket.on('mpc-command', (data) => {
-                this.handleMPCCommand(data, socket);
-            });
-
-            socket.on('neural-prediction', (data) => {
-                this.handleNeuralPrediction(data, socket);
-            });
-
-            socket.on('disconnect', () => {
-                console.log('Client disconnected:', socket.id);
-            });
-        });
-
-        // Broadcast system data every second
-        setInterval(() => {
-            const systemData = this.generateSystemData();
-            this.io.emit('system-update', systemData);
-        }, 1000);
-    }
-
-    generateSystemData() {
-        const timestamp = new Date().toISOString();
-        
-        return {
-            timestamp,
-            production: {
-                h2_rate: 0.042 + Math.random() * 0.01,
-                o2_rate: 0.021 + Math.random() * 0.005,
-                current: 150 + Math.random() * 10,
-                voltage: 38 + Math.random() * 2,
-                efficiency: 65 + Math.random() * 5
-            },
-            storage: {
-                h2_level: 50 + Math.random() * 20,
-                o2_level: 50 + Math.random() * 20,
-                pressure: 30 + Math.random() * 5
-            },
-            safety: {
-                temperature: 65 + Math.random() * 5,
-                purity: 99.5 + Math.random() * 0.3,
-                status: 'NORMAL'
-            },
-            economics: {
-                electricity_cost: 0.12 + Math.random() * 0.02,
-                production_cost: 2.5 + Math.random() * 0.3,
-                value_generated: 5.2 + Math.random() * 0.4
-            }
-        };
-    }
-
-    async handleMPCControl(data, res) {
-        try {
-            const mpcType = data.mpcType || 'HE_NMPC';
-            const result = await this.mpcComparator.computeControl(mpcType, data);
-            
-            // Send control signal to Arduino via MQTT
-            await this.mqttClient.publishControlSignal(result);
-            
-            res.json({
-                success: true,
-                mpcType,
-                optimal_current: result.optimalCurrent,
-                performance: result.performance
-            });
-        } catch (error) {
-            res.status(500).json({ success: false, error: error.message });
+  mqttClient.on('connect', () => {
+    console.log('✅ Connected to MQTT broker');
+    
+    // Subscribe to topics
+    Object.values(MQTT_TOPICS).forEach(topic => {
+      mqttClient.subscribe(topic, (err) => {
+        if (!err) {
+          console.log(`📡 Subscribed to ${topic}`);
         }
-    }
+      });
+    });
+  });
 
-    handleMPCCommand(data, socket) {
-        this.mpcComparator.evaluateMPC(data.scenario)
-            .then(results => {
-                socket.emit('mpc-results', results);
-            })
-            .catch(error => {
-                socket.emit('mpc-error', { error: error.message });
-            });
+  mqttClient.on('message', (topic, message) => {
+    try {
+      const data = JSON.parse(message.toString());
+      console.log(`📨 MQTT Message on ${topic}:`, data);
+      
+      // Broadcast to all connected web clients
+      io.emit('mqtt-data', { topic, data });
+      
+      // Handle specific topics
+      switch(topic) {
+        case MQTT_TOPICS.MATLAB_DATA:
+          io.emit('matlab-update', data);
+          break;
+        case MQTT_TOPICS.ARDUINO_DATA:
+          io.emit('arduino-update', data);
+          break;
+        case MQTT_TOPICS.MPC_COMPARISON:
+          io.emit('mpc-comparison', data);
+          break;
+      }
+    } catch (error) {
+      console.error('❌ Error parsing MQTT message:', error);
     }
+  });
 
-    async handleNeuralPrediction(data, socket) {
-        try {
-            const prediction = await this.neuralMPC.predict(data.inputs);
-            socket.emit('neural-results', prediction);
-        } catch (error) {
-            socket.emit('neural-error', { error: error.message });
-        }
-    }
-
-    getSystemStatus() {
-        return {
-            status: 'OPERATIONAL',
-            mode: 'AUTO',
-            uptime: process.uptime(),
-            connections: this.io.engine.clientsCount,
-            lastUpdate: new Date().toISOString()
-        };
-    }
-
-    startDataSimulation() {
-        // Simulate real-time data updates
-        setInterval(() => {
-            const comparisonData = this.mpcComparator.generateComparisonData();
-            this.io.emit('mpc-comparison-update', comparisonData);
-        }, 2000);
-    }
-
-    start() {
-        this.server.listen(this.port, () => {
-            console.log(`🏭 PEM Electrolyzer Dashboard running on port ${this.port}`);
-            console.log(`📊 MPC Comparator: http://localhost:${this.port}/mpc-comparison`);
-            console.log(`🧠 Neural MPC: http://localhost:${this.port}/neural-mpc`);
-        });
-    }
+  mqttClient.on('error', (error) => {
+    console.error('❌ MQTT Error:', error);
+  });
 }
 
-// Start the dashboard
-const dashboard = new PEMDashboard();
-dashboard.start();
+// Socket.io for real-time web communication
+io.on('connection', (socket) => {
+  console.log('🔌 Web client connected:', socket.id);
 
-module.exports = PEMDashboard;
+  // Handle control commands from web dashboard
+  socket.on('control-command', (data) => {
+    console.log('🎛️ Control command from web:', data);
+    
+    // Send to appropriate destination
+    if (data.destination === 'matlab') {
+      publishToMQTT(MQTT_TOPICS.MATLAB_CONTROL, data);
+    } else if (data.destination === 'arduino') {
+      publishToMQTT(MQTT_TOPICS.ARDUINO_CONTROL, data);
+    }
+  });
+
+  // Handle MPC configuration
+  socket.on('mpc-config', (config) => {
+    console.log('⚙️ MPC configuration:', config);
+    publishToMQTT(MQTT_TOPICS.MATLAB_CONTROL, {
+      type: 'mpc_config',
+      config: config
+    });
+  });
+
+  socket.on('disconnect', () => {
+    console.log('🔌 Web client disconnected:', socket.id);
+  });
+});
+
+// Publish to MQTT
+function publishToMQTT(topic, message) {
+  if (mqttClient && mqttClient.connected) {
+    mqttClient.publish(topic, JSON.stringify(message));
+    console.log(`📤 Published to ${topic}:`, message);
+  } else {
+    console.error('❌ MQTT client not connected');
+  }
+}
+
+// Routes
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/api/status', (req, res) => {
+  res.json({
+    status: 'online',
+    mqtt: mqttClient ? mqttClient.connected : false,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy',
+    services: {
+      mqtt: mqttClient?.connected || false,
+      websocket: io.engine.clientsCount,
+      timestamp: new Date().toISOString()
+    }
+  });
+});
+
+// Initialize services
+initializeMQTT();
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`🚀 PEM Electrolyzer Dashboard running on port ${PORT}`);
+  console.log(`📊 Access at: http://localhost:${PORT}`);
+});
